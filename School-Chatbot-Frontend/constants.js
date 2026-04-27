@@ -23,7 +23,8 @@
 //     localhost는 기기 자신을 가리키기 때문입니다.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const API_URL = "http://192.168.X.X:8000/chat"; // 실제 기기 (Expo Go)
+export const BASE_URL = "http://192.168.0.12:8000";        // ← IP 바뀌면 여기만 수정
+export const API_URL  = `${BASE_URL}/chat`;
 
 // 필요에 따라 아래 줄의 주석을 해제하고 위 줄을 주석 처리하세요.
 // export const API_URL = "http://localhost:8000/chat";         // iOS 시뮬레이터

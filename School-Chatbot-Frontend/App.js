@@ -15,8 +15,10 @@ import { useState } from 'react';
 
 import { API_URL } from './constants';
 import ResponseCard from './components/ResponseCard';
+import MapScreen from './screens/MapScreen';
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'map'
   const [question, setQuestion] = useState('');
   const [response, setResponse] = useState(null); // 성공 응답
   const [error, setError] = useState(null);        // 에러 메시지
@@ -66,14 +68,34 @@ export default function App() {
 
   // ── UI ─────────────────────────────────────────────────────────────────────
   return (
-    // KeyboardAvoidingView: 키보드가 올라올 때 레이아웃이 밀리지 않도록 처리
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* ── 탭 바 ── */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'chat' && styles.tabItemActive]}
+          onPress={() => setActiveTab('chat')}
+        >
+          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>챗봇</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'map' && styles.tabItemActive]}
+          onPress={() => setActiveTab('map')}
+        >
+          <Text style={[styles.tabText, activeTab === 'map' && styles.tabTextActive]}>지도 안내</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── 지도 탭 ── */}
+      {activeTab === 'map' && <MapScreen />}
+
+      {/* ── 챗봇 탭 ── */}
+      {activeTab === 'chat' && (
       <ScrollView
         contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled" // 스크롤 중 탭해도 키보드 닫힘 방지
+        keyboardShouldPersistTaps="handled"
       >
         <StatusBar style="auto" />
 
@@ -119,6 +141,8 @@ export default function App() {
         {/* 하단 여백 */}
         <View style={styles.bottomPadding} />
       </ScrollView>
+      )}
+
     </KeyboardAvoidingView>
   );
 }
@@ -194,5 +218,31 @@ const styles = StyleSheet.create({
 
   bottomPadding: {
     height: 40,
+  },
+
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingTop: 52,
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  tabItemActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#2563eb',
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    color: '#2563eb',
+    fontWeight: '700',
   },
 });
