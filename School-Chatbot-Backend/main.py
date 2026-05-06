@@ -51,24 +51,58 @@ def get_map():
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
   <style>
     * {{ margin:0; padding:0; box-sizing:border-box; }}
-    body {{ overflow:hidden; }}
-    #map {{ width:100%; height:100vh; }}
+    html, body {{ width:100%; height:100%; overflow:hidden; }}
+    #map {{ width:100%; height:100%; position:absolute; top:0; left:0; }}
     .place-label {{
-      padding:4px 8px; font-size:12px; font-weight:700;
+      padding:3px 7px; font-size:11px; font-weight:700;
       color:#1d4ed8; background:#eff6ff;
-      border:1px solid #bfdbfe; border-radius:6px; white-space:nowrap;
+      border:1px solid #bfdbfe; border-radius:5px; white-space:nowrap;
     }}
-    #nav-bar {{
-      display:none; position:fixed; bottom:0; left:0; right:0;
-      background:#1B76FF; color:#fff; padding:14px 20px;
-      font-size:15px; font-weight:700; text-align:center;
-      z-index:999;
+    #sheet {{
+      display:none; position:fixed; left:0; right:0; bottom:0;
+      background:#fff; border-radius:14px 14px 0 0;
+      box-shadow:0 -3px 12px rgba(0,0,0,0.18);
+      z-index:999; max-height:52%; flex-direction:column;
     }}
+    #sheet-handle {{
+      width:36px; height:4px; background:#ddd; border-radius:2px;
+      margin:8px auto 4px; flex-shrink:0;
+    }}
+    #sheet-header {{
+      background:#1B76FF; color:#fff;
+      padding:10px 14px 10px; flex-shrink:0;
+    }}
+    #sheet-dest {{ font-size:15px; font-weight:700; }}
+    #sheet-summary {{ font-size:12px; margin-top:3px; opacity:0.88; }}
+    #steps-list {{ overflow-y:auto; flex:1; padding:4px 0 8px; }}
+    .step-item {{
+      display:flex; align-items:center;
+      padding:9px 14px; border-bottom:1px solid #f3f3f3;
+      transition: background 0.3s;
+    }}
+    .step-item.done {{ opacity:0.4; }}
+    .step-item.current {{ background:#e8f0fe; }}
+    .step-icon {{
+      width:30px; height:30px; border-radius:50%;
+      background:#e8f0fe; display:flex; align-items:center;
+      justify-content:center; font-size:15px; flex-shrink:0;
+    }}
+    .step-item.current .step-icon {{ background:#1B76FF; color:#fff; }}
+    .step-info {{ margin-left:10px; }}
+    .step-dir {{ font-size:13px; font-weight:600; color:#1a1a1a; }}
+    .step-dist {{ font-size:11px; color:#999; margin-top:1px; }}
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div id="nav-bar">안내 중...</div>
+  <div id="sheet">
+    <div id="sheet-handle"></div>
+    <div id="sheet-header">
+      <div id="sheet-dest">목적지</div>
+      <div id="sheet-summary"></div>
+    </div>
+    <div id="steps-list"></div>
+  </div>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={KAKAO_JS_KEY}"></script>
   <script>
     var map = new kakao.maps.Map(document.getElementById('map'), {{
@@ -76,11 +110,12 @@ def get_map():
       level: 4
     }});
 
-    var places       = {places_json};
+    var places        = {places_json};
     var openInfowindow = null;
     var routePolyline  = null;
     var userOverlay    = null;
     var destMarker     = null;
+    var stepOverlays   = [];
 
     // ── 장소 마커 ──
     places.forEach(function(place) {{
@@ -113,8 +148,18 @@ def get_map():
       map.setCenter(pos);
     }}
 
+    // ── 방향 아이콘 ──
+    function dirIcon(dir) {{
+      if (dir.includes('오른쪽')) return '↱';
+      if (dir.includes('왼쪽'))  return '↰';
+      if (dir.includes('직진') || dir.includes('계속')) return '↑';
+      if (dir.includes('출발')) return '🚶';
+      if (dir.includes('도착')) return '📍';
+      return '↑';
+    }}
+
     // ── 경로 그리기 ──
-    function drawRoute(routePoints, dest) {{
+    function drawRoute(routePoints, dest, steps, distance, duration) {{
       if (routePolyline) routePolyline.setMap(null);
       if (destMarker)    destMarker.setMap(null);
 
@@ -145,17 +190,96 @@ def get_map():
       path.forEach(function(p) {{ bounds.extend(p); }});
       map.setBounds(bounds, 60);
 
-      document.getElementById('nav-bar').style.display = 'block';
-      document.getElementById('nav-bar').textContent   = dest.place_name + ' 으로 안내 중';
+      // 기존 step 마커 제거
+      stepOverlays.forEach(function(o) {{ o.setMap(null); }});
+      stepOverlays = [];
+
+      // step 번호 마커 추가
+      (steps || []).forEach(function(s, i) {{
+        if (s.lat == null || s.lng == null) return;
+        var content =
+          '<div style="' +
+            'width:24px;height:24px;border-radius:50%;' +
+            'background:#fff;border:2px solid #1B76FF;' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'font-size:11px;font-weight:700;color:#1B76FF;' +
+            'box-shadow:0 1px 4px rgba(0,0,0,0.25);' +
+          '">' + (i + 1) + '</div>';
+        var overlay = new kakao.maps.CustomOverlay({{
+          position: new kakao.maps.LatLng(s.lat, s.lng),
+          content: content,
+          zIndex: 5,
+        }});
+        overlay.setMap(map);
+        stepOverlays.push(overlay);
+      }});
+
+      // 하단 시트 표시
+      document.getElementById('sheet-dest').textContent = '📍 ' + dest.place_name;
+      document.getElementById('sheet-summary').textContent =
+        (duration || '?') + '분  ·  ' + (distance >= 1000 ? (distance/1000).toFixed(1) + 'km' : distance + 'm');
+
+      var list = document.getElementById('steps-list');
+      list.innerHTML = '';
+      (steps || []).forEach(function(s) {{
+        var item = document.createElement('div');
+        item.className = 'step-item';
+        item.innerHTML =
+          '<div class="step-icon">' + dirIcon(s.direction) + '</div>' +
+          '<div class="step-info">' +
+            '<div class="step-dir">' + s.direction + '</div>' +
+            '<div class="step-dist">' + (s.distance >= 1000 ? (s.distance/1000).toFixed(1)+'km' : s.distance+'m') + ' 이동</div>' +
+          '</div>';
+        list.appendChild(item);
+      }});
+
+      document.getElementById('sheet').style.display = 'flex';
+      setTimeout(function() {{ highlightStep(0); }}, 100);
+    }}
+
+    // ── step 하이라이트 ──
+    function highlightStep(index) {{
+      // 패널 항목 색상
+      var items = document.querySelectorAll('.step-item');
+      items.forEach(function(item, i) {{
+        item.classList.remove('current', 'done');
+        if (i < index)        item.classList.add('done');
+        else if (i === index) item.classList.add('current');
+      }});
+      if (items[index]) {{
+        items[index].scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+      }}
+
+      // 지도 마커 색상
+      stepOverlays.forEach(function(overlay, i) {{
+        var num  = i + 1;
+        var done = i < index;
+        var curr = i === index;
+        var bg   = curr ? '#1B76FF' : (done ? '#ccc' : '#fff');
+        var fg   = curr ? '#fff'    : (done ? '#fff' : '#1B76FF');
+        var border = done ? '#ccc' : '#1B76FF';
+        var label  = done ? '✓' : num;
+        overlay.setContent(
+          '<div style="' +
+            'width:24px;height:24px;border-radius:50%;' +
+            'background:' + bg + ';border:2px solid ' + border + ';' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'font-size:11px;font-weight:700;color:' + fg + ';' +
+            'box-shadow:0 1px 4px rgba(0,0,0,0.25);' +
+          '">' + label + '</div>'
+        );
+      }});
     }}
 
     // ── 안내 종료 ──
     function clearRoute() {{
       if (routePolyline) routePolyline.setMap(null);
       if (destMarker)    destMarker.setMap(null);
+      stepOverlays.forEach(function(o) {{ o.setMap(null); }});
       routePolyline = null;
       destMarker    = null;
-      document.getElementById('nav-bar').style.display = 'none';
+      stepOverlays  = [];
+      document.getElementById('sheet').style.display = 'none';
     }}
 
     // ── React Native → WebView 메시지 ──
@@ -163,7 +287,7 @@ def get_map():
       try {{
         var data = JSON.parse(event.data);
         if (data.type === 'UPDATE_LOCATION') updateUserLocation(data.lat, data.lng);
-        if (data.type === 'DRAW_ROUTE')      drawRoute(data.route, data.destination);
+        if (data.type === 'DRAW_ROUTE')      drawRoute(data.route, data.destination, data.steps, data.distance, data.duration);
         if (data.type === 'CLEAR_ROUTE')     clearRoute();
         if (data.type === 'MOVE_TO') {{
           map.setCenter(new kakao.maps.LatLng(data.lat, data.lng));
@@ -220,20 +344,64 @@ def extract_destination(question: str) -> str | None:
 
 
 # ── OSRM 경로 API (무료, API 키 불필요) ──────────────────────────────────────
+MANEUVER_KO = {
+    ("depart",  "straight"):     "출발 후 직진",
+    ("depart",  None):           "출발",
+    ("arrive",  None):           "목적지 도착",
+    ("turn",    "right"):        "오른쪽 방향",
+    ("turn",    "left"):         "왼쪽 방향",
+    ("turn",    "slight right"): "오른쪽으로 살짝",
+    ("turn",    "slight left"):  "왼쪽으로 살짝",
+    ("turn",    "sharp right"):  "오른쪽으로 크게",
+    ("turn",    "sharp left"):   "왼쪽으로 크게",
+    ("turn",    "straight"):     "직진",
+    ("continue","straight"):     "직진",
+    ("continue", None):          "계속 직진",
+    ("new name","straight"):     "직진",
+}
+
 def get_osrm_route(origin_lat, origin_lng, dest_lat, dest_lng):
     url = (
         f"http://router.project-osrm.org/route/v1/foot/"
         f"{origin_lng},{origin_lat};{dest_lng},{dest_lat}"
-        f"?geometries=geojson&overview=full"
+        f"?geometries=geojson&overview=full&steps=true"
     )
     resp = http.get(url, timeout=10)
     data = resp.json()
 
     if data.get("code") != "Ok" or not data.get("routes"):
-        return []
+        return [], [], 0, 0
 
-    coords = data["routes"][0]["geometry"]["coordinates"]
-    return [{"lat": c[1], "lng": c[0]} for c in coords]
+    route_data = data["routes"][0]
+    coords = route_data["geometry"]["coordinates"]
+    points = [{"lat": c[1], "lng": c[0]} for c in coords]
+
+    total_distance = round(route_data.get("distance", 0))
+    total_duration = round(route_data.get("duration", 0) / 60)
+
+    steps = []
+    for leg in route_data.get("legs", []):
+        for step in leg.get("steps", []):
+            maneuver  = step.get("maneuver", {})
+            m_type    = maneuver.get("type")
+            m_mod     = maneuver.get("modifier")
+            dist      = round(step.get("distance", 0))
+            location  = maneuver.get("location", [])
+            direction = (
+                MANEUVER_KO.get((m_type, m_mod))
+                or MANEUVER_KO.get((m_type, None))
+                or m_type or "직진"
+            )
+            if dist < 2:
+                continue
+            steps.append({
+                "direction": direction,
+                "distance":  dist,
+                "lng": location[0] if location else None,
+                "lat": location[1] if location else None,
+            })
+
+    return points, steps, total_distance, total_duration
 
 
 # ── /navigate 엔드포인트 ──────────────────────────────────────────────────────
@@ -250,10 +418,13 @@ def navigate(req: NavigateRequest):
         if not destination:
             return {"error": f"'{place_name}' 장소를 찾을 수 없습니다."}
 
-        route = get_osrm_route(req.lat, req.lng, destination["lat"], destination["lng"])
+        route, steps, distance, duration = get_osrm_route(req.lat, req.lng, destination["lat"], destination["lng"])
         return {
             "destination": destination,
             "route":       route,
+            "steps":       steps,
+            "distance":    distance,
+            "duration":    duration,
             "answer":      f"{destination['place_name']}으로 안내를 시작합니다.",
         }
     except Exception as e:
