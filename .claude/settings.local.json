@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:namu.wiki)",
+      "WebFetch(domain:www.bu.ac.kr)",
+      "Bash(\"School-Chatbot-Backend/venv/Scripts/python\" update_dataset.py)",
+      "Bash(Get-ChildItem -Path \"c:\\\\dev\\\\School-Chatbot\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(mkdir \"c:\\\\dev\\\\School-Chatbot\\\\School-Chatbot-Web\")",
+      "Bash(Get-ChildItem \"c:\\\\dev\\\\School-Chatbot\\\\School-Chatbot-Web\")",
+      "Bash(Select-Object Name, Length)",
+      "Bash(ls /c/Android/Sdk/system-images/ 2>/dev/null)",
+      "Read(//c/Android/Sdk/system-images//**)"
+    ],
+    "additionalDirectories": [
+      "c:\\dev\\School-Chatbot"
+    ]
+  }
+}

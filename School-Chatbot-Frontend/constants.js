@@ -23,7 +23,9 @@
 //     localhost는 기기 자신을 가리키기 때문입니다.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const BASE_URL = "http://192.168.0.12:8000";        // ← IP 바뀌면 여기만 수정
+// export const BASE_URL = "http://10.0.2.2:8000";         // 안드로이드 에뮬레이터
+export const BASE_URL = "http://172.30.1.41:8000";         // 실제 기기 (Wi-Fi)
+export const API_BASE = BASE_URL;
 export const API_URL  = `${BASE_URL}/chat`;
 
 // 필요에 따라 아래 줄의 주석을 해제하고 위 줄을 주석 처리하세요.

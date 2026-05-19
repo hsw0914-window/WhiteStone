@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <string name="app_name">흰돌이</string>
+    <style name="Theme.Whitestone" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#002D8E</item>
+        <item name="colorPrimaryVariant">#001A5C</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#002D8E</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="android:statusBarColor">@color/black</item>
+    </style>
+</resources>

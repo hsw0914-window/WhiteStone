@@ -10,30 +10,36 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
 import { CampusPlace } from '../types/place';
 import { fetchCampusPlaces } from '../services/placeService';
 import { BASE_URL } from '../constants';
 
 const MAP_URI = `${BASE_URL}/map`;
 
-export default function MapScreen() {
+type Tokens = {
+  bg: string; surface: string; surface2: string;
+  text: string; textSoft: string; textMute: string;
+  border: string; borderSoft: string;
+  blue: string; blueSoft: string; blueDark: string;
+};
+
+export default function MapScreen({ t }: { t: Tokens }) {
   const webviewRef = useRef<WebView>(null);
 
-  const [places, setPlaces]           = useState<CampusPlace[]>([]);
-  const [userInput, setUserInput]     = useState('');
+  const [places, setPlaces]               = useState<CampusPlace[]>([]);
+  const [userInput, setUserInput]         = useState('');
   const [selectedPlace, setSelectedPlace] = useState<CampusPlace | null>(null);
-  const [loading, setLoading]         = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
-  const [mapError, setMapError]       = useState<string | null>(null);
+  const [loading, setLoading]             = useState(false);
+  const [isNavigating, setIsNavigating]   = useState(false);
+  const [mapError, setMapError]           = useState<string | null>(null);
 
   const locationSub = useRef<Location.LocationSubscription | null>(null);
 
-  // ── 장소 데이터 로드 ──
   useEffect(() => {
     fetchCampusPlaces().then(setPlaces);
   }, []);
 
-  // ── GPS 권한 요청 + 실시간 위치 추적 시작 ──
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -41,13 +47,8 @@ export default function MapScreen() {
         Alert.alert('위치 권한 필요', '네비게이션을 사용하려면 위치 권한이 필요합니다.');
         return;
       }
-
       locationSub.current = await Location.watchPositionAsync(
-        {
-          accuracy:         Location.Accuracy.High,
-          timeInterval:     2000,
-          distanceInterval: 3,
-        },
+        { accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 3 },
         (loc) => {
           const { latitude, longitude } = loc.coords;
           webviewRef.current?.postMessage(
@@ -56,62 +57,47 @@ export default function MapScreen() {
         }
       );
     })();
-
-    return () => {
-      locationSub.current?.remove();
-    };
+    return () => { locationSub.current?.remove(); };
   }, []);
 
-  // ── AI 안내 요청 ──
   async function handleNavigate() {
     if (!userInput.trim()) return;
     setLoading(true);
     try {
-      // 현재 위치 가져오기
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { latitude, longitude } = loc.coords;
-
-      // 백엔드 /navigate 호출 (Gemini 목적지 추출 + 카카오 경로 계산)
       const res = await fetch(`${BASE_URL}/navigate`, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ question: userInput, lat: latitude, lng: longitude }),
+        body: JSON.stringify({ question: userInput, lat: latitude, lng: longitude }),
       });
       const data = await res.json();
-
-      if (data.error) {
-        Alert.alert('안내 실패', data.error);
-        return;
-      }
-
+      if (data.error) { Alert.alert('안내 실패', data.error); return; }
       setSelectedPlace(data.destination);
       setIsNavigating(true);
-
-      // WebView에 경로 그리기 명령
       webviewRef.current?.postMessage(
         JSON.stringify({
-          type:        'DRAW_ROUTE',
-          route:       data.route,
+          type: 'DRAW_ROUTE',
+          route: data.route,
           destination: data.destination,
+          steps: data.steps,
+          distance: data.distance,
+          duration: data.duration,
         })
       );
-    } catch (e) {
+    } catch {
       Alert.alert('오류', '서버 연결에 실패했습니다.');
     } finally {
       setLoading(false);
     }
   }
 
-  // ── 안내 종료 ──
   function stopNavigation() {
     setIsNavigating(false);
     setSelectedPlace(null);
     webviewRef.current?.postMessage(JSON.stringify({ type: 'CLEAR_ROUTE' }));
   }
 
-  // ── 빠른 선택 버튼 (테스트용) ──
   function quickMove(name: string) {
     const place = places.find(p => p.place_name === name);
     if (place) {
@@ -122,7 +108,6 @@ export default function MapScreen() {
     }
   }
 
-  // ── WebView → RN 메시지 수신 ──
   function onWebViewMessage(event: { nativeEvent: { data: string } }) {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -131,50 +116,65 @@ export default function MapScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* ── 검색창 ── */}
-      <View style={styles.searchBox}>
-        <TextInput
-          style={styles.input}
-          placeholder="예: 인쇄하는 곳으로 안내해줘"
-          placeholderTextColor="#9ca3af"
-          value={userInput}
-          onChangeText={setUserInput}
-          onSubmitEditing={handleNavigate}
-          returnKeyType="search"
-          editable={!loading}
-        />
+    <View style={[s.container, { backgroundColor: t.bg }]}>
+      {/* 헤더 */}
+      <View style={[s.headerRow, { backgroundColor: t.surface, borderBottomColor: t.borderSoft }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[s.headerTitle, { color: t.text }]}>캠퍼스 지도</Text>
+          <Text style={{ color: t.textSoft, fontSize: 12.5, marginTop: 1 }}>백석대학교</Text>
+        </View>
+      </View>
+
+      {/* 검색창 */}
+      <View style={[s.searchBox, { backgroundColor: t.surface, borderBottomColor: t.borderSoft }]}>
+        <View style={[s.searchInner, { backgroundColor: t.surface2 }]}>
+          <Ionicons name="location-outline" size={18} color={t.blue}/>
+          <TextInput
+            style={[s.input, { color: t.text }]}
+            placeholder="어디로 갈까요? (예: 도서관, 학생식당)"
+            placeholderTextColor={t.textMute}
+            value={userInput}
+            onChangeText={setUserInput}
+            onSubmitEditing={handleNavigate}
+            returnKeyType="search"
+            editable={!loading}
+          />
+        </View>
         <TouchableOpacity
-          style={[styles.btn, loading && styles.btnDisabled]}
+          style={[s.navBtn, { backgroundColor: userInput.trim() && !loading ? t.blue : t.border }]}
           onPress={handleNavigate}
-          disabled={loading}
+          disabled={loading || !userInput.trim()}
         >
           {loading
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.btnText}>안내</Text>
+            ? <ActivityIndicator color="#fff" size="small"/>
+            : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>길안내</Text>
           }
         </TouchableOpacity>
       </View>
 
-      {/* ── 빠른 선택 / 안내 종료 ── */}
-      <View style={styles.quickRow}>
+      {/* 빠른 선택 / 안내 종료 */}
+      <View style={[s.quickRow, { backgroundColor: t.surface, borderBottomColor: t.borderSoft }]}>
         {isNavigating ? (
-          <TouchableOpacity style={styles.stopBtn} onPress={stopNavigation}>
-            <Text style={styles.stopBtnText}>■ 안내 종료</Text>
+          <TouchableOpacity style={[s.stopBtn, { backgroundColor: '#EF4444' }]} onPress={stopNavigation}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>■ 안내 종료</Text>
           </TouchableOpacity>
         ) : (
           ['진리관', '도서관', '학생식당', '학생복지관'].map(name => (
-            <TouchableOpacity key={name} style={styles.quickBtn} onPress={() => quickMove(name)}>
-              <Text style={styles.quickBtnText}>{name}</Text>
+            <TouchableOpacity
+              key={name}
+              style={[s.quickBtn, { backgroundColor: t.blueSoft, borderColor: t.blue + '44' }]}
+              onPress={() => quickMove(name)}
+            >
+              <Text style={{ fontSize: 12, color: t.blue, fontWeight: '600' }}>{name}</Text>
             </TouchableOpacity>
           ))
         )}
       </View>
 
-      {/* ── 카카오맵 WebView ── */}
+      {/* 카카오맵 WebView */}
       <WebView
         ref={webviewRef}
-        style={styles.map}
+        style={s.map}
         source={{ uri: MAP_URI }}
         onError={e => setMapError(e.nativeEvent.description)}
         onMessage={onWebViewMessage}
@@ -184,75 +184,64 @@ export default function MapScreen() {
         mixedContentMode="always"
       />
 
-      {/* ── 에러 배너 ── */}
+      {/* 에러 배너 */}
       {mapError && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>지도 오류: {mapError}</Text>
+        <View style={[s.errorBanner, { backgroundColor: '#FEF2F2', borderTopColor: '#FCA5A5' }]}>
+          <Text style={{ fontSize: 12, color: '#DC2626' }}>지도 오류: {mapError}</Text>
         </View>
       )}
 
-      {/* ── 선택 장소 카드 ── */}
+      {/* 선택 장소 카드 */}
       {selectedPlace && !isNavigating && (
-        <View style={styles.placeCard}>
-          <Text style={styles.placeName}>{selectedPlace.place_name}</Text>
-          <Text style={styles.placeDesc}>{selectedPlace.description}</Text>
-          <Text style={styles.placeTags}>{selectedPlace.services.join(' · ')}</Text>
+        <View style={[s.placeCard, { backgroundColor: t.surface }]}>
+          <Text style={[s.placeName, { color: t.text }]}>{selectedPlace.place_name}</Text>
+          <Text style={[s.placeDesc, { color: t.textSoft }]}>{selectedPlace.description}</Text>
+          <Text style={{ fontSize: 12, color: t.blue, fontWeight: '600', marginTop: 4 }}>
+            {selectedPlace.services.join(' · ')}
+          </Text>
         </View>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-
+const s = StyleSheet.create({
+  container: { flex: 1 },
+  headerRow: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  headerTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   searchBox: {
     flexDirection: 'row', padding: 12, gap: 8,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb',
+    borderBottomWidth: 1,
   },
-  input: {
-    flex: 1, height: 44, backgroundColor: '#f3f4f6',
-    borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#111827',
+  searchInner: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    gap: 8, borderRadius: 14, paddingHorizontal: 12, height: 44,
   },
-  btn: {
-    width: 60, height: 44, backgroundColor: '#2563eb',
-    borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+  input: { flex: 1, fontSize: 14, paddingVertical: 0 },
+  navBtn: {
+    paddingHorizontal: 16, height: 44,
+    borderRadius: 14, alignItems: 'center', justifyContent: 'center',
   },
-  btnDisabled: { backgroundColor: '#93c5fd' },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-
   quickRow: {
-    flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, gap: 6,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb',
+    flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8,
+    gap: 6, borderBottomWidth: 1,
   },
   quickBtn: {
     paddingHorizontal: 10, paddingVertical: 6,
-    backgroundColor: '#eff6ff', borderRadius: 6,
-    borderWidth: 1, borderColor: '#bfdbfe',
+    borderRadius: 8, borderWidth: 1,
   },
-  quickBtnText: { fontSize: 12, color: '#1d4ed8', fontWeight: '600' },
-
   stopBtn: {
-    flex: 1, paddingVertical: 8, backgroundColor: '#ef4444',
-    borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+    flex: 1, paddingVertical: 8, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
   },
-  stopBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-
   map: { flex: 1 },
-
-  errorBanner: {
-    backgroundColor: '#fef2f2', padding: 10,
-    borderTopWidth: 1, borderTopColor: '#fca5a5',
-  },
-  errorText: { fontSize: 12, color: '#dc2626' },
-
+  errorBanner: { padding: 10, borderTopWidth: 1 },
   placeCard: {
     position: 'absolute', bottom: 20, left: 16, right: 16,
-    backgroundColor: '#fff', borderRadius: 12, padding: 16,
+    borderRadius: 16, padding: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
+    shadowOpacity: 0.12, shadowRadius: 8, elevation: 6,
   },
-  placeName: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 4 },
-  placeDesc: { fontSize: 13, color: '#6b7280', marginBottom: 6 },
-  placeTags: { fontSize: 12, color: '#2563eb', fontWeight: '600' },
+  placeName: { fontSize: 17, fontWeight: '700', marginBottom: 4 },
+  placeDesc: { fontSize: 13 },
 });

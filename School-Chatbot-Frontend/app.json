@@ -1,7 +1,9 @@
 {
   "expo": {
-    "name": "학교 안내 AI 챗봇",
+    "name": "백돌이",
     "slug": "school-chatbot-frontend",
+    "owner": "hsw7777",
+    "scheme": "school-chatbot",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,10 +18,14 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-      }
+      },
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "bundler": "metro"
-    }
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

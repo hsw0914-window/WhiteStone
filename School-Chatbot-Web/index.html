@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>티더미 – 백석대학교 챗봇</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"/>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: #0a0e1a;
+    color: #e8ecf5;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  button { font-family: inherit; }
+  input::placeholder { color: #94A0B5; opacity: 1; }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-thumb { background: rgba(127,140,170,0.3); border-radius: 4px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+
+  .stage {
+    width: 100vw; height: 100vh;
+    background:
+      radial-gradient(1200px 800px at 20% 10%, rgba(37,99,235,0.12), transparent 60%),
+      radial-gradient(1000px 700px at 90% 90%, rgba(37,99,235,0.10), transparent 60%),
+      #0a0f1c;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .phone {
+    width: 380px; height: 800px;
+    border-radius: 44px;
+    background: #0a0a0a;
+    padding: 10px;
+    box-shadow:
+      0 40px 100px rgba(0,0,0,0.5),
+      0 0 0 1px rgba(255,255,255,0.05) inset,
+      0 0 0 8px #1a1d24,
+      0 0 0 9px #2a2d35;
+    position: relative;
+  }
+  .phone-screen {
+    width: 100%; height: 100%;
+    border-radius: 36px;
+    overflow: hidden;
+    background: #fff;
+    position: relative;
+  }
+  .brand {
+    position: absolute;
+    top: 28px; left: 32px;
+    color: rgba(232,236,245,0.7);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .brand-sub {
+    position: absolute;
+    top: 50px; left: 32px;
+    color: rgba(232,236,245,0.4);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+
+  @media (max-width: 480px) {
+    .phone { width: 100vw; height: 100vh; border-radius: 0; padding: 0; box-shadow: none; }
+    .phone-screen { border-radius: 0; }
+    .brand { display: none; }
+    .brand-sub { display: none; }
+  }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div class="stage">
+    <div class="brand">티더미 · 백석대학교 AI 챗봇</div>
+    <div class="brand-sub">Prototype · 라이트/다크 모드 · 5탭 네비게이션</div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div id="app" style="width:100%; height:100%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="text/babel" data-presets="react" src="app.jsx"></script>
+  <script type="text/babel" data-presets="react" src="screens-chat.jsx"></script>
+  <script type="text/babel" data-presets="react" src="screens-other.jsx"></script>
+  <script type="text/babel" data-presets="react" src="screens-login.jsx"></script>
+  <script type="text/babel" data-presets="react" src="screens-auth.jsx"></script>
+  <script type="text/babel" data-presets="react" src="main.jsx"></script>
+</body>
+</html>

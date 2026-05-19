@@ -1,0 +1,28 @@
+R_DEF: Internal format may change without notice
+local
+color black
+color white
+drawable ic_whitestone_logo
+id chatInputEditText
+id chatLogRecyclerView
+id inputAreaContainer
+id mainConstraintLayout
+id mapCloseButton
+id mapContainer
+id mapWebView
+id sendButton
+id textBotMessage
+id textBotTime
+id textUserMessage
+id textUserTime
+id toggleChatbotButton
+id topBarCloseIcon
+id topBarContainer
+id topBarLogoIcon
+layout item_chat_bot
+layout item_chat_user
+layout white_stone_main
+string app_name
+style Theme.Whitestone
+xml backup_rules
+xml data_extraction_rules

@@ -1,0 +1,30 @@
+[
+    {
+        "merged": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-merged_res-34:\\layout_item_chat_user.xml.flat",
+        "source": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-main-36:\\layout\\item_chat_user.xml"
+    },
+    {
+        "merged": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-merged_res-34:\\xml_backup_rules.xml.flat",
+        "source": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-main-36:\\xml\\backup_rules.xml"
+    },
+    {
+        "merged": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-merged_res-34:\\layout_item_chat_bot.xml.flat",
+        "source": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-main-36:\\layout\\item_chat_bot.xml"
+    },
+    {
+        "merged": "Whitestone.AI.app-merged_res-34:/layout_white_stone_main.xml.flat",
+        "source": "Whitestone.AI.app-main-36:/layout/white_stone_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-merged_res-34:\\layout_white_stone_main.xml.flat",
+        "source": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-main-36:\\layout\\white_stone_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-merged_res-34:\\drawable_ic_whitestone_logo.png.flat",
+        "source": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-main-36:\\drawable\\ic_whitestone_logo.png"
+    },
+    {
+        "merged": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-merged_res-34:\\xml_data_extraction_rules.xml.flat",
+        "source": "C:\\Users\\한승우\\.gradle\\daemon\\8.2\\Whitestone.AI.app-main-36:\\xml\\data_extraction_rules.xml"
+    }
+]
