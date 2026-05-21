@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     GEMINI_API_KEY: str = ""
+    KAKAO_REST_API_KEY: str = ""
+    KAKAO_JS_KEY: str = ""
 
     # 매칭 임계값: 이 값 미만이면 fallback 메시지 반환
     MATCH_THRESHOLD: float = 0.1

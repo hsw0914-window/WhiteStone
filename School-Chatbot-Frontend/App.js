@@ -91,6 +91,7 @@ export default function App() {
         code,
         code_verifier: codeVerifier,
         redirect_uri: GOOGLE_REDIRECT_URI,
+        client_id: GOOGLE_WEB_CLIENT_ID,
       });
       setAuth(data.token, data.user);
       setUser(data.user);

@@ -2,7 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.db import init_db
 from app.routers import health, chat
+from app.routers import auth, sessions
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -10,7 +12,6 @@ app = FastAPI(
     debug=settings.DEBUG,
 )
 
-# CORS 설정 (프론트엔드 연동 시 origins 목록 조정)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,5 +20,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+init_db()
+
 app.include_router(health.router, tags=["Health"])
 app.include_router(chat.router, tags=["Chat"])
+app.include_router(auth.router, tags=["Auth"])
+app.include_router(sessions.router, tags=["Sessions"])

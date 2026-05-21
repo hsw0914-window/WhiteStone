@@ -24,7 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 // export const BASE_URL = "http://10.0.2.2:8000";         // 안드로이드 에뮬레이터
-export const BASE_URL = "http://172.30.1.41:8000";         // 실제 기기 (Wi-Fi)
+export const BASE_URL = "http://192.168.0.8:8000";         // 실제 기기 (Wi-Fi)
 export const API_BASE = BASE_URL;
 export const API_URL  = `${BASE_URL}/chat`;
 
