@@ -127,7 +127,7 @@ def send_message(session_id: str, req: MessageRequest, current_user: dict = Depe
     _assert_owner(conn, session_id, current_user["id"])
     now = datetime.now().isoformat()
 
-    conn.execute(
+    user_insert = conn.execute(
         "INSERT INTO messages (session_id, role, text, created_at) VALUES (?, 'user', ?, ?)",
         (session_id, req.text, now)
     )
@@ -135,6 +135,10 @@ def send_message(session_id: str, req: MessageRequest, current_user: dict = Depe
 
     result = generate_answer(req.text)
     bot_reply = result.answer
+    conn.execute(
+        "UPDATE messages SET category = ?, confidence = ? WHERE id = ?",
+        (result.category or "기타", float(result.confidence or 0.0), user_insert.lastrowid)
+    )
 
     bot_now = datetime.now().isoformat()
     conn.execute(

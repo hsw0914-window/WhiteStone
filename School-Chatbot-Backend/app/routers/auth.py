@@ -1,4 +1,5 @@
 import hashlib
+import os
 import secrets
 import sqlite3
 from fastapi import APIRouter, HTTPException, Depends, Header
@@ -10,7 +11,11 @@ from app.db import get_conn
 
 router = APIRouter(prefix="/auth")
 
-GOOGLE_WEB_CLIENT_ID = "985939853275-46vknlh7ahkag296e278h135qcuesm34.apps.googleusercontent.com"
+GOOGLE_WEB_CLIENT_ID = os.getenv(
+    "GOOGLE_WEB_CLIENT_ID",
+    "985939853275-46vknlh7ahkag296e278h135qcuesm34.apps.googleusercontent.com",
+)
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_WEB_CLIENT_SECRET", "")
 
 
 # ── 스키마 ────────────────────────────────────────────────────────────────────
@@ -106,13 +111,21 @@ def _google_user_from_access_token(access_token: str):
         timeout=10,
     )
     if not resp.ok:
-        raise HTTPException(status_code=401, detail="구글 인증에 실패했습니다.")
+        detail = _google_error_detail(resp, "Google userinfo request failed.")
+        raise HTTPException(status_code=401, detail=f"Google userinfo request failed: {detail}")
 
     info = resp.json()
     email = (info.get("email") or "").strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="구글 계정에서 이메일을 가져올 수 없습니다.")
     return email, info.get("name") or email.split("@")[0]
+
+def _google_error_detail(resp, fallback: str) -> str:
+    try:
+        data = resp.json()
+    except ValueError:
+        return fallback
+    return data.get("error_description") or data.get("error") or fallback
 
 def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -182,12 +195,19 @@ def google_code(req: GoogleCodeRequest):
         "redirect_uri": req.redirect_uri,
         "grant_type": "authorization_code",
     }
+    if not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail="백엔드 .env에 GOOGLE_CLIENT_SECRET을 설정해 주세요.",
+        )
+    payload["client_secret"] = GOOGLE_CLIENT_SECRET
     if req.code_verifier:
         payload["code_verifier"] = req.code_verifier
 
     resp = requests.post("https://oauth2.googleapis.com/token", data=payload, timeout=10)
     if not resp.ok:
-        raise HTTPException(status_code=401, detail="구글 로그인 토큰 교환에 실패했습니다.")
+        detail = _google_error_detail(resp, "Google login token exchange failed.")
+        raise HTTPException(status_code=401, detail=f"Google login token exchange failed: {detail}")
 
     access_token = resp.json().get("access_token")
     if not access_token:

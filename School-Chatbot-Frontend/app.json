@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "백돌이",
+    "name": "흰돌이",
     "slug": "school-chatbot-frontend",
     "owner": "hsw7777",
     "scheme": "school-chatbot",
@@ -25,7 +25,8 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store"
     ]
   }
 }

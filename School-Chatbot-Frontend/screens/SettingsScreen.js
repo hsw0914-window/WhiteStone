@@ -1,13 +1,15 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ProfileMenuButton from '../components/ProfileMenuButton';
 
-export default function SettingsScreen({ t, dark, onToggleDark, onLogout, user }) {
+export default function SettingsScreen({ t, dark, onToggleDark, onLogout, user, onMyPage, onSettings }) {
   const initial = (user?.name || '?')[0];
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={[s.header, { backgroundColor: t.surface, borderBottomColor: t.borderSoft }]}>
         <Text style={[s.headerTitle, { color: t.text }]}>설정</Text>
+        <ProfileMenuButton t={t} user={user} onMyPage={onMyPage} onSettings={onSettings} onLogout={onLogout} />
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }}>
@@ -97,7 +99,14 @@ function Row({ t, icon, label, right, danger, onPress, chevron, last }) {
 }
 
 const s = StyleSheet.create({
-  header: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   headerTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   profileCard: {
     flexDirection: 'row', alignItems: 'center',

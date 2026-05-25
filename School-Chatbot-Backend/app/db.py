@@ -6,6 +6,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "..", "chatbot.db")
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=TRUNCATE")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -45,5 +46,10 @@ def init_db():
             FOREIGN KEY (session_id) REFERENCES chat_sessions(id)
         );
     """)
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(messages)").fetchall()}
+    if "category" not in columns:
+        conn.execute("ALTER TABLE messages ADD COLUMN category TEXT")
+    if "confidence" not in columns:
+        conn.execute("ALTER TABLE messages ADD COLUMN confidence REAL")
     conn.commit()
     conn.close()

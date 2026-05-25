@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, StyleSheet,
-  RefreshControl, Modal, TextInput, Alert,
+  RefreshControl, Modal, TextInput,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Mascot from '../components/Mascot';
+import ProfileMenuButton from '../components/ProfileMenuButton';
 import { formatTime } from '../utils/formatTime';
 
-export default function ChatListScreen({ t, sessions, loading, onOpen, onNew, onRefresh, onDelete, onRename }) {
+export default function ChatListScreen({ t, sessions, loading, onOpen, onNew, onRefresh, onDelete, onRename, user, onMyPage, onSettings, onLogout }) {
   const [renaming, setRenaming] = useState(null); // { id, title }
   const [renameText, setRenameText] = useState('');
+  const [actionSession, setActionSession] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const openRenameModal = (session) => {
+    if (!session) return;
     setRenaming(session);
     setRenameText(session.title);
   };
@@ -23,27 +27,20 @@ export default function ChatListScreen({ t, sessions, loading, onOpen, onNew, on
     setRenaming(null);
   };
 
-  const confirmDelete = (session) => {
-    Alert.alert(
-      '대화 삭제',
-      `"${session.title}" 대화를 삭제할까요?\n삭제된 대화는 복구할 수 없어요.`,
-      [
-        { text: '취소', style: 'cancel' },
-        { text: '삭제', style: 'destructive', onPress: () => onDelete(session.id) },
-      ]
-    );
+  const openDeleteModal = (session) => {
+    if (!session) return;
+    setActionSession(null);
+    setDeleteTarget(session);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    onDelete(deleteTarget.id);
+    setDeleteTarget(null);
   };
 
   const handleLongPress = (session) => {
-    Alert.alert(
-      session.title,
-      '',
-      [
-        { text: '이름 변경', onPress: () => openRenameModal(session) },
-        { text: '삭제', style: 'destructive', onPress: () => confirmDelete(session) },
-        { text: '취소', style: 'cancel' },
-      ]
-    );
+    setActionSession(session);
   };
 
   return (
@@ -54,9 +51,7 @@ export default function ChatListScreen({ t, sessions, loading, onOpen, onNew, on
           <Text style={[s.headerTitle, { color: t.text }]}>채팅방</Text>
           <Text style={{ color: t.textSoft, fontSize: 12.5, marginTop: 1 }}>{sessions.length}개의 대화</Text>
         </View>
-        <TouchableOpacity onPress={onNew} style={[s.newBtn, { backgroundColor: t.blueSoft }]}>
-          <Ionicons name="add" size={22} color={t.blue}/>
-        </TouchableOpacity>
+        <ProfileMenuButton t={t} user={user} onMyPage={onMyPage} onSettings={onSettings} onLogout={onLogout} />
       </View>
 
       {/* 이름 변경 모달 */}
@@ -105,6 +100,103 @@ export default function ChatListScreen({ t, sessions, loading, onOpen, onNew, on
             </TouchableOpacity>
           </TouchableOpacity>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* 대화 메뉴 모달 */}
+      <Modal
+        visible={!!actionSession}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionSession(null)}
+      >
+        <TouchableOpacity
+          style={s.backdrop}
+          activeOpacity={1}
+          onPress={() => setActionSession(null)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[s.modalBox, s.sheetBox, { backgroundColor: t.surface }]}>
+            <View style={s.sheetHeader}>
+              <View style={[s.sheetIcon, { backgroundColor: t.blueSoft }]}>
+                <Ionicons name="chatbubble-ellipses-outline" size={18} color={t.blue} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[s.modalTitle, { color: t.text }]} numberOfLines={2}>
+                  {actionSession?.title}
+                </Text>
+                <Text style={[s.modalSub, { color: t.textSoft }]}>대화 관리</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[s.actionBtn, { backgroundColor: t.surface2, borderColor: t.borderSoft }]}
+              activeOpacity={0.8}
+              onPress={() => {
+                const target = actionSession;
+                setActionSession(null);
+                openRenameModal(target);
+              }}
+            >
+              <Ionicons name="create-outline" size={18} color={t.blue} />
+              <Text style={[s.actionText, { color: t.text }]}>이름 변경</Text>
+              <Ionicons name="chevron-forward" size={16} color={t.textMute} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[s.actionBtn, { backgroundColor: t.surface2, borderColor: t.borderSoft }]}
+              activeOpacity={0.8}
+              onPress={() => openDeleteModal(actionSession)}
+            >
+              <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              <Text style={[s.actionText, { color: '#EF4444' }]}>삭제</Text>
+              <Ionicons name="chevron-forward" size={16} color={t.textMute} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[s.modalBtn, { borderColor: t.border }]}
+              onPress={() => setActionSession(null)}
+            >
+              <Text style={{ color: t.textSoft, fontWeight: '700', fontSize: 15 }}>취소</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 대화 삭제 확인 모달 */}
+      <Modal
+        visible={!!deleteTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteTarget(null)}
+      >
+        <TouchableOpacity
+          style={s.backdrop}
+          activeOpacity={1}
+          onPress={() => setDeleteTarget(null)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[s.modalBox, { backgroundColor: t.surface }]}>
+            <View style={[s.deleteIcon, { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
+              <Ionicons name="trash-outline" size={22} color="#EF4444" />
+            </View>
+            <Text style={[s.modalTitle, { color: t.text }]}>대화 삭제</Text>
+            <Text style={[s.modalMessage, { color: t.textSoft }]}>
+              "{deleteTarget?.title}" 대화를 삭제할까요?{'\n'}삭제된 대화는 복구할 수 없어요.
+            </Text>
+            <View style={s.modalBtns}>
+              <TouchableOpacity
+                style={[s.modalBtn, { borderColor: t.border }]}
+                onPress={() => setDeleteTarget(null)}
+              >
+                <Text style={{ color: t.textSoft, fontWeight: '700', fontSize: 15 }}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.modalBtn, s.modalBtnPrimary, { backgroundColor: '#EF4444' }]}
+                onPress={confirmDelete}
+              >
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>삭제</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       <FlatList
@@ -164,7 +256,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1,
   },
   headerTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  newBtn: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   list: { padding: 12, paddingBottom: 20 },
   searchBar: {
     flexDirection: 'row', alignItems: 'center',
@@ -191,18 +282,29 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', padding: 24,
   },
   modalBox: {
-    width: '100%', borderRadius: 20,
-    padding: 24, gap: 16,
+    width: '100%', borderRadius: 8,
+    padding: 20, gap: 14,
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  sheetBox: { padding: 16 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 2 },
+  sheetIcon: { width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  modalTitle: { fontSize: 17, fontWeight: '900', letterSpacing: 0 },
+  modalSub: { fontSize: 12, fontWeight: '700', marginTop: 2, letterSpacing: 0 },
+  modalMessage: { fontSize: 13.5, fontWeight: '600', lineHeight: 21, letterSpacing: 0 },
+  deleteIcon: { width: 44, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  actionBtn: {
+    borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 13,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+  },
+  actionText: { flex: 1, fontSize: 14, fontWeight: '800', letterSpacing: 0 },
   modalInput: {
-    borderWidth: 1, borderRadius: 12,
+    borderWidth: 1, borderRadius: 8,
     paddingHorizontal: 14, paddingVertical: 11,
     fontSize: 15,
   },
   modalBtns: { flexDirection: 'row', gap: 10 },
   modalBtn: {
-    flex: 1, borderWidth: 1, borderRadius: 12,
+    flex: 1, borderWidth: 1, borderRadius: 8,
     paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
   },
   modalBtnPrimary: { borderWidth: 0 },

@@ -5,24 +5,27 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Mascot from '../components/Mascot';
+import ProfileMenuButton from '../components/ProfileMenuButton';
 import { formatTime } from '../utils/formatTime';
 
 const QUICK_GRID = [
-  { emoji: '📚', label: '도서관\n이용시간',    question: '도서관 이용시간 알려줘' },
-  { emoji: '🚌', label: '셔틀버스\n시간표',    question: '셔틀버스 시간표 알려줘' },
-  { emoji: '📅', label: '수강신청\n일정',      question: '수강신청 일정 알려줘' },
-  { emoji: '🏠', label: '기숙사\n입사 안내',   question: '기숙사 입사 방법 알려줘' },
-  { emoji: '📶', label: '교내\nWi-Fi 연결',   question: '교내 Wi-Fi 연결 방법 알려줘' },
-  { emoji: '💰', label: '등록금\n납부 기간',   question: '등록금 납부 기간 알려줘' },
-  { emoji: '🎓', label: '졸업\n이수학점',      question: '졸업 최저 이수학점 알려줘' },
-  { emoji: '🍽️', label: '학내 식당\n위치 안내', question: '학내 식당 위치 안내해줘' },
-  { emoji: '🎯', label: '비교과\n프로그램',    question: '비교과 프로그램 목록 알려줘' },
+  { emoji: '📅', title: '학사일정', subtitle: '수강·정정', question: '백석대학교 수강신청 및 수강정정 일정을 알려줘.' },
+  { emoji: '📚', title: '수강신청', subtitle: '2025-1학기', question: '백석대학교 2025-1학기 수강신청 안내에 대해 자세히 알려줘.' },
+  { emoji: '💰', title: '등록금', subtitle: '납부 안내', question: '백석대학교 2026-1학기 등록금 세부안내에 대해 자세히 알려줘.' },
+  { emoji: '🏠', title: '기숙사', subtitle: '입퇴사', question: '백석대학교 기숙사 입/퇴사 안내 및 입주절차에 대해 자세히 알려줘.' },
+  { emoji: '🚌', title: '셔틀버스', subtitle: '시간표', question: '백석대학교 2026-1학기 통학버스 및 셔틀버스 시간표 안내에 대해 자세히 알려줘.' },
+  { emoji: '📖', title: '도서관', subtitle: '이용방법', question: '백석대학교 도서관 이용방법에 대해 자세히 알려줘.' },
+  { emoji: '🎓', title: '장학금', subtitle: '지급 방식', question: '백석대학교 장학금은 어떻게 지급돼? 학비감면이야?' },
+  { emoji: '🙏', title: '채플', subtitle: '필수 여부', question: '백석대학교 채플(예배)은 필수야? 안 들으면 어떻게 돼?' },
+  { emoji: '🧾', title: '증명서', subtitle: '발급 위치', question: '백석대학교 교내 증명서 무인발급기(자동발급기) 위치랑 이용 시간 알려줘.' },
 ];
 
-export default function ChatRoomScreen({ t, session, onBack, onSend, loading }) {
+export default function ChatRoomScreen({ t, session, onBack, onSend, loading, user, onMyPage, onSettings, onLogout }) {
   const [input, setInput] = useState('');
   const flatRef = useRef(null);
   const messages = session?.messages || [];
+  const initialBotMessage = isNewChat(messages) ? messages[0] : null;
+  const listMessages = initialBotMessage ? messages.slice(1) : messages;
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -51,49 +54,42 @@ export default function ChatRoomScreen({ t, session, onBack, onSend, loading }) 
           </Text>
           <Text style={{ color: t.textSoft, fontSize: 11.5 }}>흰돌이 · 백석대학교 챗봇</Text>
         </View>
-        <Ionicons name="ellipsis-horizontal" size={22} color={t.textSoft}/>
+        <ProfileMenuButton t={t} user={user} onMyPage={onMyPage} onSettings={onSettings} onLogout={onLogout} />
       </View>
 
       {/* 메시지 목록 */}
       <FlatList
         ref={flatRef}
-        data={messages}
+        data={listMessages}
         keyExtractor={(_, i) => String(i)}
         style={{ flex: 1, backgroundColor: t.bg }}
         contentContainerStyle={{ padding: 14, paddingBottom: 8 }}
         ListHeaderComponent={
           isNew ? (
             <>
-              {/* 인트로 카드 */}
-              <View style={[s.intro, { backgroundColor: t.blue }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <Mascot size={36} t={t}/>
-                  <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '600' }}>
-                    백석대학교 AI 챗봇
-                  </Text>
-                </View>
-                <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.5, lineHeight: 28 }}>
-                  안녕하세요!{'\n'}흰돌이가 도와드릴게요.
-                </Text>
-                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13.5, marginTop: 8, lineHeight: 21 }}>
-                  학사일정, 시설, 학식, 수강신청까지{'\n'}무엇이든 물어보세요.
-                </Text>
-              </View>
+              {initialBotMessage && <Bubble t={t} m={initialBotMessage} />}
 
               {/* 빠른 질문 3×3 그리드 */}
+              <View style={s.quickHead}>
+                <Text style={s.quickHeadIcon}>💡</Text>
+                <Text style={[s.quickHeadText, { color: t.textSoft }]}>자주 묻는 질문</Text>
+              </View>
               <View style={s.gridWrap}>
                 {[0, 1, 2].map(row => (
                   <View key={row} style={s.gridRow}>
                     {QUICK_GRID.slice(row * 3, row * 3 + 3).map(item => (
                       <TouchableOpacity
-                        key={item.label}
+                        key={item.title}
                         disabled={loading}
                         onPress={() => onSend(item.question)}
                         style={[s.gridItem, { backgroundColor: t.surface, borderColor: t.borderSoft }]}
                         activeOpacity={0.7}
                       >
-                        <Text style={s.gridEmoji}>{item.emoji}</Text>
-                        <Text style={[s.gridLabel, { color: t.text }]}>{item.label}</Text>
+                        <View style={[s.gridEmojiWrap, { backgroundColor: t.blueSoft }]}>
+                          <Text style={s.gridEmoji}>{item.emoji}</Text>
+                        </View>
+                        <Text style={[s.gridTitle, { color: t.text }]} numberOfLines={1}>{item.title}</Text>
+                        <Text style={[s.gridSub, { color: t.textSoft }]} numberOfLines={1}>{item.subtitle}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -137,6 +133,10 @@ export default function ChatRoomScreen({ t, session, onBack, onSend, loading }) 
   );
 }
 
+function isNewChat(messages) {
+  return messages.length === 1 && messages[0]?.role === 'bot';
+}
+
 function Bubble({ t, m }) {
   const isMe = m.role === 'user';
   return (
@@ -174,19 +174,38 @@ const s = StyleSheet.create({
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginRight: 4 },
   headerTitle: { fontSize: 16, fontWeight: '700' },
   intro: { borderRadius: 20, padding: 20, marginBottom: 12 },
+  quickHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 6,
+    paddingTop: 2,
+    paddingBottom: 8,
+  },
+  quickHeadIcon: { fontSize: 13 },
+  quickHeadText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
   gridWrap: { marginBottom: 10, gap: 8 },
   gridRow: { flexDirection: 'row', gap: 8 },
   gridItem: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 10,
     paddingHorizontal: 4,
   },
-  gridEmoji: { fontSize: 22, marginBottom: 6 },
-  gridLabel: { fontSize: 11.5, fontWeight: '600', textAlign: 'center', lineHeight: 16 },
+  gridEmojiWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  gridEmoji: { fontSize: 19 },
+  gridTitle: { fontSize: 11.5, fontWeight: '800', textAlign: 'center', lineHeight: 15 },
+  gridSub: { fontSize: 10.5, fontWeight: '600', textAlign: 'center', marginTop: 2 },
   bubbleWrap: { marginVertical: 6, alignItems: 'flex-end' },
   bubble: { padding: 12, borderRadius: 18, borderWidth: 1 },
   inputArea: { padding: 10, paddingBottom: 14, borderTopWidth: 1 },
