@@ -430,6 +430,9 @@ function TopicsView({ t, total, categories }) {
 
 function RecommendView({ t, top, categories, recommendation, loading, error, onRetry, onCopyQuestion }) {
   const rest = categories.filter((cat) => cat.name !== top.name).slice(0, 4);
+  const fallbackReason = recommendation.reason
+    ? ` · ${recommendation.reason}`
+    : '';
 
   return (
     <>
@@ -447,7 +450,7 @@ function RecommendView({ t, top, categories, recommendation, loading, error, onR
               <Text style={[s.aiBadge, { color: t.blue, backgroundColor: t.blueSoft }]}>AI</Text>
             </View>
             <Text style={[s.recommendSub, { color: t.textSoft }]}>
-              {loading ? 'AI가 추천 질문을 만드는 중' : recommendation.source === 'ai' ? 'AI 생성 완료' : '기본 추천 표시 중'}
+              {loading ? 'AI가 추천 질문을 만드는 중' : recommendation.source === 'ai' ? 'AI 생성 완료' : `기본 추천 표시 중${fallbackReason}`}
             </Text>
           </View>
           {loading && <ActivityIndicator size="small" color={t.blue} />}

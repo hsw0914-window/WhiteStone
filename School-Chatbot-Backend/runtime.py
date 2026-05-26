@@ -1073,6 +1073,7 @@ def build_insight_recommendation(category: str) -> dict:
         "blurb": recommendation["blurb"],
         "questions": recommendation["questions"],
         "source": "fallback",
+        "reason": "fallback",
     }
 
 
@@ -1096,7 +1097,10 @@ def parse_json_array_text(text: str) -> list[str]:
 def generate_insight_recommendation(category: str, user_questions: list[str]) -> dict:
     fallback = build_insight_recommendation(category)
     recent_questions = [q.strip() for q in user_questions if q and q.strip()][-12:]
-    if len(recent_questions) < 2 or not GEMINI_API_KEY:
+    if not recent_questions:
+        return {**fallback, "reason": "no_user_questions"}
+    if not GEMINI_API_KEY:
+        return {**fallback, "reason": "missing_gemini_api_key"}
         return fallback
 
     questions_text = "\n".join(f"- {question}" for question in recent_questions)
@@ -1123,16 +1127,17 @@ def generate_insight_recommendation(category: str, user_questions: list[str]) ->
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
         generated = parse_json_array_text(getattr(response, "text", str(response)))
         if len(generated) < 3:
-            return fallback
+            return {**fallback, "reason": "ai_returned_less_than_3_questions"}
         blurb = f"최근 {category} 관련 질문 흐름을 바탕으로 다음 질문을 추천해요."
         return {
             "topic": category,
             "blurb": blurb,
             "questions": generated,
             "source": "ai",
+            "reason": "generated",
         }
-    except Exception:
-        return fallback
+    except Exception as exc:
+        return {**fallback, "reason": f"ai_error: {type(exc).__name__}"}
 
 
 COURSE_GROUPS = {
@@ -2138,6 +2143,7 @@ def get_insight_recommendation(days: int = 30, current_user: dict = Depends(get_
             "blurb": recommendation.get("blurb", ""),
             "questions": recommendation.get("questions", []),
             "source": recommendation.get("source", "fallback"),
+            "reason": recommendation.get("reason", ""),
         }
     finally:
         conn.close()
