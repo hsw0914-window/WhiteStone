@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import runtime
 from routers import auth, chat, health, insights, map, recommend, sessions
+from services.startup_service import initialize_app
 
 app = FastAPI()
 
@@ -16,7 +16,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    await runtime.startup()
+    await initialize_app()
 
 
 app.include_router(health.router)

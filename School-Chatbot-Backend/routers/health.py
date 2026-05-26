@@ -1,3 +1,11 @@
-from ._runtime import build_router
+from fastapi import APIRouter
 
-router = build_router(paths={"/"})
+from services import health_service
+
+
+router = APIRouter()
+
+
+@router.get("/")
+def read_root():
+    return health_service.read_root()

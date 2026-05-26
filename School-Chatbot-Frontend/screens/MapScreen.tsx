@@ -302,14 +302,7 @@ export default function MapScreen({ t }: { t: Tokens }) {
 
   return (
     <View style={[s.container, { backgroundColor: t.bg }]}>
-      <View style={[s.headerRow, { backgroundColor: t.surface, borderBottomColor: t.borderSoft }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[s.headerTitle, { color: t.text }]}>캠퍼스 지도</Text>
-          <Text style={{ color: t.textSoft, fontSize: 12.5, marginTop: 1 }}>백석대학교</Text>
-        </View>
-      </View>
-
-      <View style={[s.panel, { backgroundColor: t.surface, borderBottomColor: t.borderSoft }]}>
+      <View style={[s.panel, { backgroundColor: t.surface }]}>
         <View style={s.searchRow}>
           <View style={[s.searchInner, { backgroundColor: t.surface2, borderColor: t.borderSoft }]}>
             <View style={[s.searchIcon, { backgroundColor: t.blueSoft }]}>
@@ -460,9 +453,7 @@ export default function MapScreen({ t }: { t: Tokens }) {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  headerRow: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 22, fontWeight: '900', letterSpacing: 0 },
-  panel: { padding: 12, gap: 10, borderBottomWidth: 1 },
+  panel: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12, gap: 10 },
   searchRow: { flexDirection: 'row', gap: 8 },
   searchInner: {
     flex: 1, flexDirection: 'row', alignItems: 'center',

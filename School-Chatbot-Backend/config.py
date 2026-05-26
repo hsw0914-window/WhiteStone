@@ -8,7 +8,8 @@ DB_PATH = os.path.join(BASE_DIR, "chatbot.db")
 
 KAKAO_JS_KEY = os.getenv("KAKAO_JS_KEY", "")
 KAKAO_REST_KEY = os.getenv("KAKAO_REST_API_KEY", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 GOOGLE_WEB_CLIENT_ID = os.getenv(
     "GOOGLE_WEB_CLIENT_ID",
     "985939853275-46vknlh7ahkag296e278h135qcuesm34.apps.googleusercontent.com",

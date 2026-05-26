@@ -3,6 +3,7 @@ import {
   ActivityIndicator, View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ProfileMenuButton from '../components/ProfileMenuButton';
 
 const MAJORS = [
@@ -15,6 +16,7 @@ const MAJORS = [
 export default function MyPageScreen({
   t, user, onBack, onSaveProfile, onMyPage, onSettings, onLogout,
 }) {
+  const insets = useSafeAreaInsets();
   const [major, setMajor] = useState(user?.major || '');
   const [grade, setGrade] = useState(user?.grade || 0);
   const [saved, setSaved] = useState(false);
@@ -85,7 +87,7 @@ export default function MyPageScreen({
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 112 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 24) + 124 }}
         showsVerticalScrollIndicator={false}
       >
         <View style={[s.profileCard, { backgroundColor: t.surface, borderColor: t.borderSoft }]}>
@@ -149,7 +151,16 @@ export default function MyPageScreen({
         </View>
       </ScrollView>
 
-      <View style={[s.bottom, { backgroundColor: t.surface, borderTopColor: t.borderSoft }]}>
+      <View
+        style={[
+          s.bottom,
+          {
+            backgroundColor: t.surface,
+            borderTopColor: t.borderSoft,
+            paddingBottom: Math.max(insets.bottom, 20) + 10,
+          },
+        ]}
+      >
         <TouchableOpacity
           onPress={save}
           disabled={saving || !canSave || (!dirty && !saved)}
@@ -286,7 +297,7 @@ const s = StyleSheet.create({
   infoCard: { marginTop: 18, borderWidth: 1, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoIcon: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   infoText: { flex: 1, fontSize: 12.5, lineHeight: 18, fontWeight: '700' },
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
+  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 12 },
   saveBtn: { minHeight: 52, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   saveText: { fontSize: 15, fontWeight: '900' },
 });

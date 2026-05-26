@@ -1,3 +1,12 @@
-from ._runtime import build_router
+from fastapi import APIRouter
 
-router = build_router(paths={"/chat"})
+from schemas import ChatRequest
+from services import chat_service
+
+
+router = APIRouter()
+
+
+@router.post("/chat")
+def chat(req: ChatRequest):
+    return chat_service.chat(req)

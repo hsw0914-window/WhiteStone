@@ -6,7 +6,8 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
-    GEMINI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    CLAUDE_MODEL: str = "claude-haiku-4-5-20251001"
     KAKAO_REST_API_KEY: str = ""
     KAKAO_JS_KEY: str = ""
 

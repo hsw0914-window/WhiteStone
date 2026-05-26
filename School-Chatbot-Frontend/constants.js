@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = 'http://172.30.1.89:8000';
+const DEFAULT_BASE_URL = 'http://10.170.106.14:8000';
 const DEFAULT_GOOGLE_WEB_CLIENT_ID = '985939853275-46vknlh7ahkag296e278h135qcuesm34.apps.googleusercontent.com';
 const DEFAULT_GOOGLE_REDIRECT_URI = 'https://auth.expo.io/@hsw7777/school-chatbot-frontend';
 

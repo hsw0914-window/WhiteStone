@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 WebBrowser.maybeCompleteAuthSession();
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { tokens } from './utils/tokens';
 import { setAuth, getToken, saveAuth, restoreAuth, clearAuth } from './utils/auth';
@@ -30,7 +31,7 @@ const GOOGLE_DISCOVERY = {
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
 };
 
-export default function App() {
+function AppContent() {
   const [dark, setDark] = useState(false);
   const t = tokens(dark);
 
@@ -475,5 +476,13 @@ export default function App() {
       )}
       {renderToast()}
     </View>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }

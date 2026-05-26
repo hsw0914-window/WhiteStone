@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Mascot from '../components/Mascot';
 import ProfileMenuButton from '../components/ProfileMenuButton';
 import { formatTime } from '../utils/formatTime';
@@ -21,6 +22,7 @@ const QUICK_GRID = [
 ];
 
 export default function ChatRoomScreen({ t, session, onBack, onSend, loading, user, onMyPage, onSettings, onLogout }) {
+  const insets = useSafeAreaInsets();
   const [input, setInput] = useState('');
   const flatRef = useRef(null);
   const messages = session?.messages || [];
@@ -63,7 +65,7 @@ export default function ChatRoomScreen({ t, session, onBack, onSend, loading, us
         data={listMessages}
         keyExtractor={(_, i) => String(i)}
         style={{ flex: 1, backgroundColor: t.bg }}
-        contentContainerStyle={{ padding: 14, paddingBottom: 8 }}
+        contentContainerStyle={{ padding: 14, paddingBottom: Math.max(insets.bottom, 18) + 18 }}
         ListHeaderComponent={
           isNew ? (
             <>
@@ -103,7 +105,16 @@ export default function ChatRoomScreen({ t, session, onBack, onSend, loading, us
       />
 
       {/* 입력 영역 */}
-      <View style={[s.inputArea, { backgroundColor: t.surface, borderTopColor: t.borderSoft }]}>
+      <View
+        style={[
+          s.inputArea,
+          {
+            backgroundColor: t.surface,
+            borderTopColor: t.borderSoft,
+            paddingBottom: Math.max(insets.bottom, 20) + 8,
+          },
+        ]}
+      >
         <View style={[s.inputRow, { backgroundColor: t.surface2 }]}>
           <TextInput
             style={[s.input, { color: t.text }]}
@@ -208,7 +219,7 @@ const s = StyleSheet.create({
   gridSub: { fontSize: 10.5, fontWeight: '600', textAlign: 'center', marginTop: 2 },
   bubbleWrap: { marginVertical: 6, alignItems: 'flex-end' },
   bubble: { padding: 12, borderRadius: 18, borderWidth: 1 },
-  inputArea: { padding: 10, paddingBottom: 14, borderTopWidth: 1 },
+  inputArea: { paddingHorizontal: 10, paddingTop: 10, borderTopWidth: 1 },
   inputRow: {
     flexDirection: 'row', alignItems: 'center',
     borderRadius: 24, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, gap: 8,

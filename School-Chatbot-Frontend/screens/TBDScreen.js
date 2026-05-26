@@ -202,6 +202,27 @@ function RecommendCard({ t, loading, onPress }) {
 }
 
 function ResultCard({ t, user, result, sections, totalCourses, totalCredits, loading, onPress }) {
+  const sectionKey = sections.map(section => section.name).join('|');
+  const [expanded, setExpanded] = useState({});
+
+  useEffect(() => {
+    setExpanded(prev => {
+      const next = {};
+      sections.forEach((section, index) => {
+        next[section.name] = prev[section.name] ?? index === 0;
+      });
+      return next;
+    });
+  }, [sectionKey]);
+
+  const allExpanded = sections.length > 0 && sections.every(section => expanded[section.name]);
+  const toggleSection = name => setExpanded(prev => ({ ...prev, [name]: !prev[name] }));
+  const toggleAll = () => {
+    const next = {};
+    sections.forEach(section => { next[section.name] = !allExpanded; });
+    setExpanded(next);
+  };
+
   return (
     <View style={[s.resultCard, { backgroundColor: t.surface, borderColor: t.borderSoft }]}>
       <View style={s.resultHead}>
@@ -216,12 +237,28 @@ function ResultCard({ t, user, result, sections, totalCourses, totalCredits, loa
         </TouchableOpacity>
       </View>
 
+      {sections.length > 0 && (
+        <TouchableOpacity
+          style={[s.foldAllBtn, { backgroundColor: t.surface2, borderColor: t.borderSoft }]}
+          onPress={toggleAll}
+          activeOpacity={0.75}
+        >
+          <Ionicons name={allExpanded ? 'remove-circle-outline' : 'add-circle-outline'} size={15} color={t.blue} />
+          <Text style={[s.foldAllText, { color: t.blue }]}>
+            {allExpanded ? '전체 접기' : '전체 펼치기'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {sections.length > 0 ? sections.map(section => {
         const group = GROUP_META[section.name] || { color: t.blue, soft: t.blueSoft, icon: 'layers-outline' };
+        const isExpanded = !!expanded[section.name];
+        const courseCount = (section.courses || []).length;
+        const previewNames = (section.courses || []).slice(0, 2).map(course => course.name).join(', ');
         return (
           <View key={section.name} style={[s.sectionBox, { borderColor: t.borderSoft }]}>
             <View style={[s.sectionAccent, { backgroundColor: group.color }]} />
-            <View style={s.sectionHead}>
+            <TouchableOpacity style={s.sectionHead} onPress={() => toggleSection(section.name)} activeOpacity={0.75}>
               <View style={[s.sectionIcon, { backgroundColor: group.soft }]}>
                 <Ionicons name={group.icon} size={16} color={group.color} />
               </View>
@@ -234,18 +271,27 @@ function ResultCard({ t, user, result, sections, totalCourses, totalCredits, loa
                 </View>
                 <Text style={[s.sectionDesc, { color: t.textSoft }]}>{section.description}</Text>
               </View>
-            </View>
-            {(section.courses || []).map(course => {
-              const required = course.type === '전공필수';
+              <View style={[s.foldIcon, { backgroundColor: group.soft }]}>
+                <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={group.color} />
+              </View>
+            </TouchableOpacity>
+            {!isExpanded && !!previewNames && (
+              <Text style={[s.collapsedPreview, { color: t.textSoft }]} numberOfLines={1}>
+                {previewNames}{courseCount > 2 ? ` 외 ${courseCount - 2}개` : ''}
+              </Text>
+            )}
+            {isExpanded && (section.courses || []).map(course => {
               return (
                 <View key={`${section.name}-${course.name}`} style={[s.courseRow, { backgroundColor: t.surface2 }]}>
-                  <Text style={[s.courseName, { color: t.text }]} numberOfLines={1}>{course.name}</Text>
-                  <Text style={[s.credit, { color: t.textSoft }]}>{course.credit || 3}학점</Text>
-                  <View style={[s.typeBadge, { backgroundColor: required ? group.color : group.soft }]}>
-                    <Text style={[s.typeText, { color: required ? '#fff' : group.color }]}>
-                      {course.type || '전공선택'}
-                    </Text>
+                  <View style={s.courseTextWrap}>
+                    <Text style={[s.courseName, { color: t.text }]} numberOfLines={2}>{course.name}</Text>
+                    {!!course.reason && (
+                      <Text style={[s.courseReason, { color: t.textSoft }]} numberOfLines={2}>
+                        {course.reason}
+                      </Text>
+                    )}
                   </View>
+                  <Text style={[s.credit, { color: t.textSoft }]}>{course.credit || 3}학점</Text>
                 </View>
               );
             })}
@@ -311,19 +357,23 @@ const s = StyleSheet.create({
   resultTitle: { fontSize: 16, fontWeight: '900' },
   resultSub: { fontSize: 11.5, marginTop: 3, fontWeight: '600' },
   regenBtn: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  foldAllBtn: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+  foldAllText: { fontSize: 11.5, fontWeight: '900' },
   sectionBox: { borderWidth: 1, borderRadius: 8, padding: 10, paddingLeft: 14, marginTop: 8, overflow: 'hidden' },
   sectionAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 9 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   sectionIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   sectionName: { fontSize: 13.5, fontWeight: '900' },
   sectionChip: { fontSize: 10, fontWeight: '900', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' },
   sectionDesc: { fontSize: 11, marginTop: 1, fontWeight: '600' },
-  courseRow: { minHeight: 42, borderRadius: 8, paddingHorizontal: 10, marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  courseName: { flex: 1, fontSize: 13, fontWeight: '800' },
-  credit: { fontSize: 11, fontWeight: '700' },
-  typeBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
-  typeText: { fontSize: 10, fontWeight: '900' },
+  foldIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  collapsedPreview: { fontSize: 11.5, fontWeight: '700', marginTop: 8, paddingLeft: 41 },
+  courseRow: { minHeight: 48, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginTop: 6, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  courseTextWrap: { flex: 1, minWidth: 0 },
+  courseName: { fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  courseReason: { fontSize: 11.3, lineHeight: 16, marginTop: 2, fontWeight: '600' },
+  credit: { fontSize: 11, fontWeight: '700', paddingTop: 2 },
   emptyResult: { fontSize: 13, fontWeight: '700', lineHeight: 20 },
   answerBox: { borderRadius: 8, padding: 12, marginTop: 12 },
   answerTitle: { fontSize: 12, fontWeight: '900', marginBottom: 6 },

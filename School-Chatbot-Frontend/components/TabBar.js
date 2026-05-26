@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { Platform, View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TABS = [
   { id: 'chats',    label: '채팅방', icon: 'chatbubble-ellipses-outline' },
@@ -12,12 +13,29 @@ const TABS = [
 ];
 
 export default function TabBar({ t, active, onChange }) {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 28 : 12);
+
   return (
-    <View style={[s.bar, { backgroundColor: t.surface, borderTopColor: t.borderSoft }]}>
+    <View
+      style={[
+        s.bar,
+        {
+          backgroundColor: t.surface,
+          borderTopColor: t.borderSoft,
+          paddingBottom: bottomInset + 8,
+        },
+      ]}
+    >
       {TABS.map(tab => {
         if (tab.center) {
           return (
-            <TouchableOpacity key="new" onPress={() => onChange('new')} style={s.centerWrap}>
+            <TouchableOpacity
+              key="new"
+              onPress={() => onChange('new')}
+              style={s.centerWrap}
+              activeOpacity={0.85}
+            >
               <View style={[s.centerBtn, { backgroundColor: t.blue }]}>
                 <Ionicons name="add" size={30} color="#fff"/>
               </View>
@@ -27,7 +45,12 @@ export default function TabBar({ t, active, onChange }) {
         const isActive = active === tab.id;
         const color = isActive ? t.blue : t.textSoft;
         return (
-          <TouchableOpacity key={tab.id} onPress={() => onChange(tab.id)} style={s.tab}>
+          <TouchableOpacity
+            key={tab.id}
+            onPress={() => onChange(tab.id)}
+            style={s.tab}
+            activeOpacity={0.75}
+          >
             {tab.icon === 'bs-pie-chart'
               ? <BsPieChartIcon size={22} color={color} />
               : <Ionicons name={tab.icon} size={22} color={color}/>
@@ -68,14 +91,13 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     borderTopWidth: 1,
     paddingTop: 8,
-    paddingBottom: 10,
     alignItems: 'flex-end',
   },
   tab: {
-    flex: 1, alignItems: 'center', paddingVertical: 4,
+    flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 54, paddingVertical: 4,
   },
   centerWrap: {
-    flex: 1, alignItems: 'center', marginBottom: 10,
+    flex: 1, alignItems: 'center', marginBottom: 8,
   },
   centerBtn: {
     width: 52, height: 52, borderRadius: 16,

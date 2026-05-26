@@ -8,7 +8,7 @@
 
 - Python 3.10 이상
 - Node.js v18 이상
-- Gemini API 키 ([Google AI Studio](https://aistudio.google.com)에서 발급)
+- Claude API 키 ([Anthropic Console](https://console.anthropic.com/)에서 발급)
 
 ---
 
@@ -36,27 +36,28 @@ source venv/bin/activate
 
 ```bash
 pip install -r requirements.txt
-pip install google-genai
 ```
 
 > **Windows에서 한글 사용자 이름(예: 한승우)인 경우**  
 > `pip` 명령이 `Fatal error in launcher` 오류를 내면 아래처럼 실행하세요.
 > ```bash
 > python -m pip install -r requirements.txt
-> python -m pip install google-genai
 > ```
 
-### 1-4. Gemini API 키 환경변수 설정
+### 1-4. Claude API 키 환경변수 설정
 
 ```bash
 # Windows (cmd)
-set GEMINI_API_KEY=여기에_발급받은_API_키_입력
+set ANTHROPIC_API_KEY=여기에_발급받은_Claude_API_키_입력
+set CLAUDE_MODEL=claude-haiku-4-5-20251001
 
 # Windows (PowerShell)
-$env:GEMINI_API_KEY="여기에_발급받은_API_키_입력"
+$env:ANTHROPIC_API_KEY="여기에_발급받은_Claude_API_키_입력"
+$env:CLAUDE_MODEL="claude-haiku-4-5-20251001"
 
 # macOS / Linux
-export GEMINI_API_KEY="여기에_발급받은_API_키_입력"
+export ANTHROPIC_API_KEY="여기에_발급받은_Claude_API_키_입력"
+export CLAUDE_MODEL="claude-haiku-4-5-20251001"
 ```
 
 ### 1-5. 서버 실행
@@ -152,7 +153,8 @@ npx expo start --lan
 ```
 1. 백엔드 터미널
    └─ venv 활성화
-   └─ GEMINI_API_KEY 환경변수 설정
+   └─ ANTHROPIC_API_KEY 환경변수 설정
+   └─ CLAUDE_MODEL 환경변수 설정(기본값: claude-haiku-4-5-20251001)
    └─ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
       (한글 사용자 이름이면 python -m uvicorn 사용)
 
@@ -170,9 +172,9 @@ npx expo start --lan
 | 증상 | 해결 방법 |
 |------|----------|
 | `Fatal error in launcher` (pip/uvicorn) | 한글 사용자 이름 경로 문제 → `python -m pip` / `python -m uvicorn` 으로 대체 |
-| `GEMINI_API_KEY가 설정되지 않았습니다` | 환경변수 설정 후 서버 재시작 |
+| `ANTHROPIC_API_KEY is not configured.` | Claude API 키 환경변수 설정 후 서버 재시작 |
 | `uvicorn: command not found` | 가상환경 활성화 여부 확인 |
-| `ModuleNotFoundError: google.genai` | `python -m pip install google-genai` 실행 |
+| Claude 응답이 fallback으로 나옴 | `ANTHROPIC_API_KEY`, `CLAUDE_MODEL` 설정과 Railway Variables 반영 여부 확인 |
 | Expo Go에서 `Failed to download remote update` | PC와 폰이 같은 Wi-Fi인지 확인, `npx expo start --lan` 으로 재시작 |
 | Expo Go SDK 버전 불일치 | `npm install expo@~54.0.0 && npx expo install --fix` 실행 |
 | `Cannot find module 'babel-preset-expo'` | `npm install babel-preset-expo` 실행 후 재시작 |

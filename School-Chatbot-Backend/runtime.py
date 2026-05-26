@@ -2,18 +2,17 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import json, os, re, requests as http
-from google import genai
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 import sqlite3, secrets, uuid
 from datetime import datetime, timedelta
 
+from ai_client import generate_ai_text, has_ai_key
 from config import (
     BASE_DIR,
     DB_PATH,
     DISTANCE_THRESHOLD,
-    GEMINI_API_KEY,
     GOOGLE_CLIENT_SECRET,
     GOOGLE_WEB_CLIENT_ID,
     GRADE_MAX,
@@ -112,10 +111,15 @@ def validate_profile_values(major: str, grade: int):
 # ── 서버 시작 시 한 번만 로드 ─────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
-    global model, index, dataset, building_places, roadmap_courses
+    global model, index, dataset, building_places, roadmap_courses, response_cache
 
     init_db()
     print("AI 챗봇 엔진 초기화 중...")
+
+    dataset = []
+    building_places = []
+    roadmap_courses = []
+    response_cache = {}
 
     model = SentenceTransformer("jhgan/ko-sroberta-multitask", device="cpu")
 
@@ -695,11 +699,9 @@ def navigate(req: NavigateRequest):
 
 찾을 수 없으면: {{"place_name": null}}"""
 
-        if GEMINI_API_KEY:
+        if has_ai_key():
             try:
-                client = genai.Client(api_key=GEMINI_API_KEY)
-                response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-                text     = getattr(response, "text", "").strip()
+                text     = generate_ai_text(prompt, max_tokens=300).strip()
                 match    = re.search(r'\{.*?\}', text, re.DOTALL)
                 if match:
                     place_name = json.loads(match.group()).get("place_name")
@@ -830,11 +832,9 @@ def process_chat_question(question: str, current_user: dict | None = None) -> di
 
         final_answer = build_facility_fallback_answer(question, source)
         answer_source = "백석대학교 데이터셋"
-        if GEMINI_API_KEY:
+        if has_ai_key():
             try:
-                client = genai.Client(api_key=GEMINI_API_KEY)
-                response     = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-                final_answer = getattr(response, "text", str(response)) or final_answer
+                final_answer = generate_ai_text(prompt, max_tokens=700) or final_answer
                 answer_source = "백석대학교 AI 챗봇"
             except Exception:
                 pass
@@ -871,11 +871,9 @@ def process_chat_question(question: str, current_user: dict | None = None) -> di
 
         final_answer = build_dataset_fallback_answer(top_matches)
         answer_source = "백석대학교 데이터셋"
-        if GEMINI_API_KEY:
+        if has_ai_key():
             try:
-                client = genai.Client(api_key=GEMINI_API_KEY)
-                response     = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-                final_answer = getattr(response, "text", str(response)) or final_answer
+                final_answer = generate_ai_text(prompt, max_tokens=700) or final_answer
                 answer_source = "백석대학교 AI 챗봇"
             except Exception:
                 pass
@@ -1100,7 +1098,7 @@ def classify_single_intent(intent_text: str) -> dict:
 
 
 def should_use_ai_intent_classifier(question: str, local_items: list[dict]) -> bool:
-    if not GEMINI_API_KEY or not local_items:
+    if not has_ai_key() or not local_items:
         return False
     if all(item.get("category") == "범위밖" for item in local_items):
         return False
@@ -1174,9 +1172,7 @@ def classify_question_intents_with_ai(question: str, local_items: list[dict]) ->
   {{"intent_text":"인쇄는 어디서 해","category":"생활편의","confidence":0.82}}
 ]"""
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-        ai_items = parse_ai_intent_classification(getattr(response, "text", str(response)))
+        ai_items = parse_ai_intent_classification(generate_ai_text(prompt, max_tokens=700))
         return ai_items or local_items
     except Exception:
         return local_items
@@ -1242,14 +1238,26 @@ def parse_json_array_text(text: str) -> list[str]:
     return questions[:3]
 
 
+def parse_json_object_text(text: str) -> dict:
+    raw = (text or "").strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw).strip()
+    match = re.search(r"\{[\s\S]*\}", raw)
+    if match:
+        raw = match.group(0)
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError("AI response is not a JSON object")
+    return data
+
+
 def generate_insight_recommendation(category: str, user_questions: list[str]) -> dict:
     fallback = build_insight_recommendation(category)
     recent_questions = [q.strip() for q in user_questions if q and q.strip()][-12:]
     if not recent_questions:
         return {**fallback, "reason": "no_user_questions"}
-    if not GEMINI_API_KEY:
-        return {**fallback, "reason": "missing_gemini_api_key"}
-        return fallback
+    if not has_ai_key():
+        return {**fallback, "reason": "missing_anthropic_api_key"}
 
     questions_text = "\n".join(f"- {question}" for question in recent_questions)
     prompt = f"""너는 백석대학교 AI 챗봇의 인사이트 추천 질문 생성기야.
@@ -1271,9 +1279,7 @@ def generate_insight_recommendation(category: str, user_questions: list[str]) ->
 ["이번 학기 수강신청 변경 기간은 언제야?", "전공필수 과목을 못 들으면 어떻게 해야 해?", "성적 정정 신청은 어디서 해?"]"""
 
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-        generated = parse_json_array_text(getattr(response, "text", str(response)))
+        generated = parse_json_array_text(generate_ai_text(prompt, max_tokens=500))
         if len(generated) < 3:
             return {**fallback, "reason": "ai_returned_less_than_3_questions"}
         blurb = f"최근 {category} 관련 질문 흐름을 바탕으로 다음 질문을 추천해요."
@@ -1364,6 +1370,50 @@ def parse_replacement_limit(text: str) -> str:
     return match.group(1).strip() if match else ""
 
 
+NON_COURSE_PREFIXES = {
+    "주의사항", "안내사항", "참고", "비고", "유의사항", "설명", "추천", "권장",
+    "기초", "핵심", "심화", "응용", "기초교과군", "핵심교과군", "심화교과군", "응용교과군",
+    "1학년", "2학년", "3학년", "4학년",
+}
+
+NON_COURSE_KEYWORDS = (
+    "교과군", "주의사항", "안내사항", "유의", "공지", "로드맵", "수강 정원",
+    "선수과목", "개설 학기", "변동", "확인", "추천합니다", "설명", "학년별",
+)
+
+
+def stable_course_id(major: str | None, group: str | None, name: str, grade: int | None, semester: int | None) -> str:
+    raw = f"{major or ''}|{group or ''}|{name}|{grade or ''}|{semester or ''}"
+    return re.sub(r"[^0-9A-Za-z가-힣._|-]+", "_", raw).strip("_")
+
+
+def normalize_course_name(text: str) -> str:
+    name = re.split(r"\s*[\(（]", text, maxsplit=1)[0].strip()
+    name = re.sub(r"^\d+\.\s*", "", name)
+    for prefix in ("필수 교과목", "선택 교과목", "전공필수", "전공선택", "추천 과목", "권장 과목"):
+        if name.startswith(f"{prefix}:"):
+            name = name.split(":", 1)[1].strip()
+    name = re.sub(r"^[가-힣A-Za-z]+\s*:\s*", "", name).strip()
+    return name
+
+
+def is_probably_course_line(text: str, name: str) -> bool:
+    if not text or not name:
+        return False
+    heading = text.split(":", 1)[0].strip()
+    if heading in NON_COURSE_PREFIXES:
+        return False
+    if name in NON_COURSE_PREFIXES:
+        return False
+    if len(name) < 2 or len(name) > 38:
+        return False
+    if any(keyword in name for keyword in NON_COURSE_KEYWORDS):
+        return False
+    if any(keyword in text for keyword in ("다음과 같이", "확인해주세요", "문의", "홈페이지")):
+        return False
+    return True
+
+
 def parse_courses_from_output(
     output: str,
     source_group: str | None,
@@ -1382,8 +1432,8 @@ def parse_courses_from_output(
         text = text.lstrip("-").strip()
         if not text:
             continue
-        name = re.split(r"\s*[\(（]", text, maxsplit=1)[0].strip()
-        if not name:
+        name = normalize_course_name(text)
+        if not is_probably_course_line(text, name):
             continue
         if "필수" in text or "캡스톤디자인" in name:
             type_name = "전공필수"
@@ -1395,6 +1445,7 @@ def parse_courses_from_output(
         credit = int(credit_match.group(1)) if credit_match else 3
         courses.append({
             "major": major or "",
+            "id": stable_course_id(major, source_group, name, grade, semester),
             "name": name,
             "credit": credit,
             "type": type_name,
@@ -1532,6 +1583,123 @@ def fallback_recommend_answer(major: str, grade: int, sections: list[dict]) -> s
     return "\n".join(lines)
 
 
+def compact_course_for_ai(course: dict) -> dict:
+    return {
+        "id": course.get("id") or stable_course_id(
+            course.get("major"),
+            course.get("group"),
+            course.get("name", ""),
+            course.get("grade"),
+            course.get("semester"),
+        ),
+        "name": course.get("name", ""),
+        "group": course.get("group", ""),
+        "credit": course.get("credit") or 3,
+        "grade": course.get("grade") or "",
+        "semester": course.get("semester") or "",
+        "note": course.get("note", "")[:120],
+    }
+
+
+def build_ai_course_sections(major: str, grade: int, sections: list[dict], question: str | None = None) -> tuple[list[dict], str] | None:
+    prompt_candidates = []
+    by_id = {}
+    for section in sections:
+        for course in section.get("courses", []):
+            course_id = course.get("id") or stable_course_id(
+                course.get("major"),
+                course.get("group"),
+                course.get("name", ""),
+                course.get("grade"),
+                course.get("semester"),
+            )
+            if not course_id or course_id in by_id:
+                continue
+            full_course = dict(course)
+            full_course["id"] = course_id
+            by_id[course_id] = full_course
+            prompt_candidates.append(compact_course_for_ai(full_course))
+    if not prompt_candidates or not has_ai_key():
+        return None
+
+    if not by_id:
+        return None
+
+    candidate_text = json.dumps(prompt_candidates[:48], ensure_ascii=False, indent=2)
+    focus = ", ".join(recommend_focus_groups(grade))
+    prompt = f"""너는 백석대학교 첨단IT학부 로드맵 과목 추천 엔진이야.
+
+아래 후보 과목 목록에 있는 과목만 사용해서 {grade}학년 {major}전공 학생에게 맞는 과목을 골라줘.
+
+[사용자 질문]
+{question or f"{grade}학년 {major}전공 학생에게 맞는 과목을 추천해줘"}
+
+[우선 교과군]
+{focus}
+
+[후보 과목 JSON]
+{candidate_text}
+
+규칙:
+1. 후보 목록에 없는 과목은 절대 만들지 마.
+2. 학생의 전공, 학년, 우선 교과군을 보고 실제로 확인하면 좋은 과목만 골라.
+3. 각 교과군별 최대 5개만 골라.
+4. reason은 한 문장의 자연스러운 한국어로만 짧게 써.
+5. 설명문 없이 아래 JSON 객체만 반환해.
+
+출력 형식:
+{{
+  "summary": "추천 요약 한두 문장",
+  "sections": [
+    {{
+      "name": "기초",
+      "courses": [
+        {{ "id": "후보 id", "reason": "추천 이유" }}
+      ]
+    }}
+  ]
+}}"""
+
+    data = parse_json_object_text(generate_ai_text(prompt, max_tokens=1100, timeout=35))
+    raw_sections = data.get("sections")
+    if not isinstance(raw_sections, list):
+        return None
+
+    grouped = {name: [] for name in COURSE_GROUPS}
+    used_ids = set()
+    for raw_section in raw_sections:
+        if not isinstance(raw_section, dict):
+            continue
+        for raw_course in raw_section.get("courses", []):
+            if not isinstance(raw_course, dict):
+                continue
+            course_id = str(raw_course.get("id") or "").strip()
+            if not course_id or course_id in used_ids or course_id not in by_id:
+                continue
+            course = dict(by_id[course_id])
+            group = course.get("group")
+            if group not in grouped or len(grouped[group]) >= 5:
+                continue
+            reason = str(raw_course.get("reason") or "").strip()
+            if reason:
+                course["reason"] = reason[:90]
+            grouped[group].append(course)
+            used_ids.add(course_id)
+
+    result_sections = []
+    for group, desc in COURSE_GROUPS.items():
+        if grouped[group]:
+            result_sections.append({"name": group, "description": desc, "courses": grouped[group]})
+
+    if not result_sections:
+        return None
+
+    summary = str(data.get("summary") or "").strip()
+    if not summary:
+        summary = fallback_recommend_answer(major, grade, result_sections)
+    return result_sections, summary
+
+
 def is_roadmap_question(question: str) -> bool:
     text = normalize_question_text(question).lower()
     if not text:
@@ -1610,40 +1778,14 @@ def build_course_recommendation(major: str, grade: int, question: str | None = N
             "source_count": 0,
         }
 
-    reference_text = "\n\n".join(
-        f"[{item.get('label', '')}] {item.get('instruction', '')}\n{item.get('output', '')}"
-        for item in filtered_items[:22]
-    )
-    question_text = question or f"{grade}학년 {major}전공 학생에게 맞는 과목을 추천해줘"
-    focus = ", ".join(recommend_focus_groups(grade))
-    prompt = f"""너는 백석대학교 수강 안내 챗봇이야.
-
-[학생 질문]
-{question_text}
-
-[참고 데이터]
-{reference_text}
-
-[학생 정보]
-전공: {major}, 학년: {grade}학년
-
-규칙:
-1. 위 참고 데이터에 있는 내용만 사용해서 답해
-2. 없는 과목명, 학점, 필수 여부, 정원, 선수과목은 새로 만들지 마
-3. {grade}학년 {major}전공 학생에게 맞는 수강 과목을 추천해줘
-4. 우선 확인할 교과군은 {focus}이야
-5. 교과군별(기초/핵심/심화/응용)로 나눠서 설명해줘
-6. 수강 정원, 선수과목, 개설 학기는 변동될 수 있음을 알려줘
-7. 한국어로 자연스럽게 답해"""
-
     answer = fallback_recommend_answer(major, grade, sections)
     source = "fallback"
-    if GEMINI_API_KEY:
+    if has_ai_key():
         try:
-            client = genai.Client(api_key=GEMINI_API_KEY)
-            response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-            answer = getattr(response, "text", str(response)) or answer
-            source = "ai"
+            ai_result = build_ai_course_sections(major, grade, sections, question)
+            if ai_result:
+                sections, answer = ai_result
+                source = "ai"
         except Exception:
             pass
 
