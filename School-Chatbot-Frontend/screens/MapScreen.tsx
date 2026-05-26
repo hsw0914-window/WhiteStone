@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -15,6 +15,9 @@ import { fetchCampusPlaces } from '../services/placeService';
 import { BASE_URL } from '../constants';
 
 const MAP_URI = `${BASE_URL}/map`;
+const STEP_COMPLETE_RADIUS_M = 22;
+const ARRIVAL_RADIUS_M = 25;
+
 const QUICK_PLACES = [
   { name: '진리관', icon: 'business-outline' },
   { name: '도서관', icon: 'library-outline' },
@@ -29,19 +32,90 @@ type Tokens = {
   blue: string; blueSoft: string; blueDark: string;
 };
 
+type LatLng = { lat: number; lng: number };
+
+type RouteStep = {
+  direction: string;
+  distance: number;
+  lat: number | null;
+  lng: number | null;
+};
+
+type NavigationState = {
+  destination: CampusPlace;
+  steps: RouteStep[];
+  activeStepIndex: number;
+  totalDistance: number;
+  duration: number;
+  remainingDistance: number;
+  arrived: boolean;
+};
+
+function distanceMeters(a: LatLng, b: LatLng) {
+  const radius = 6371000;
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return radius * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function formatDistance(value: number) {
+  if (!Number.isFinite(value)) return '-';
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}km`;
+  return `${Math.max(0, Math.round(value))}m`;
+}
+
+function nextActiveStepIndex(current: LatLng, steps: RouteStep[], startIndex: number) {
+  let index = startIndex;
+  while (index < steps.length) {
+    const step = steps[index];
+    if (step.lat == null || step.lng == null) {
+      index += 1;
+      continue;
+    }
+    const distance = distanceMeters(current, { lat: step.lat, lng: step.lng });
+    if (distance <= STEP_COMPLETE_RADIUS_M) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  return index;
+}
+
 export default function MapScreen({ t }: { t: Tokens }) {
   const webviewRef = useRef<WebView>(null);
 
-  const [places, setPlaces]               = useState<CampusPlace[]>([]);
-  const [userInput, setUserInput]         = useState('');
+  const [places, setPlaces] = useState<CampusPlace[]>([]);
+  const [userInput, setUserInput] = useState('');
   const [selectedPlace, setSelectedPlace] = useState<CampusPlace | null>(null);
-  const [loading, setLoading]             = useState(false);
-  const [isNavigating, setIsNavigating]   = useState(false);
-  const [mapError, setMapError]           = useState<string | null>(null);
-  const [toast, setToast]                 = useState<{ message: string; tone: 'info' | 'error' } | null>(null);
+  const [navigation, setNavigation] = useState<NavigationState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [followUser, setFollowUser] = useState(true);
+  const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null);
 
   const locationSub = useRef<Location.LocationSubscription | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navigationRef = useRef<NavigationState | null>(null);
+  const followUserRef = useRef(true);
+
+  const isNavigating = !!navigation && !navigation.arrived;
+
+  const remainingSteps = useMemo(() => {
+    if (!navigation) return [];
+    return navigation.steps.slice(Math.min(navigation.activeStepIndex, navigation.steps.length));
+  }, [navigation]);
+
+  function postToMap(payload: Record<string, unknown>) {
+    webviewRef.current?.postMessage(JSON.stringify(payload));
+  }
 
   function showToast(message: string, tone: 'info' | 'error' = 'info') {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -54,53 +128,141 @@ export default function MapScreen({ t }: { t: Tokens }) {
   }, []);
 
   useEffect(() => {
+    navigationRef.current = navigation;
+  }, [navigation]);
+
+  useEffect(() => {
+    followUserRef.current = followUser;
+    postToMap({ type: 'FOLLOW_USER', enabled: followUser });
+  }, [followUser]);
+
+  useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        showToast('네비게이션을 사용하려면 위치 권한이 필요해요.', 'error');
+        showToast('내비게이션을 사용하려면 위치 권한이 필요해요.', 'error');
         return;
       }
+
       locationSub.current = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 3 },
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 1500,
+          distanceInterval: 3,
+        },
         (loc) => {
-          const { latitude, longitude } = loc.coords;
-          webviewRef.current?.postMessage(
-            JSON.stringify({ type: 'UPDATE_LOCATION', lat: latitude, lng: longitude })
-          );
+          const current = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+          postToMap({
+            type: 'UPDATE_LOCATION',
+            lat: current.lat,
+            lng: current.lng,
+            follow: followUserRef.current,
+          });
+          updateNavigationProgress(current);
         }
       );
     })();
+
     return () => {
       locationSub.current?.remove();
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
 
+  function updateNavigationProgress(current: LatLng) {
+    const state = navigationRef.current;
+    if (!state || state.arrived) return;
+
+    const destinationDistance = distanceMeters(current, {
+      lat: state.destination.lat,
+      lng: state.destination.lng,
+    });
+
+    if (destinationDistance <= ARRIVAL_RADIUS_M) {
+      const arrivedState = {
+        ...state,
+        activeStepIndex: state.steps.length,
+        remainingDistance: 0,
+        arrived: true,
+      };
+      navigationRef.current = arrivedState;
+      setNavigation(arrivedState);
+      setFollowUser(true);
+      postToMap({ type: 'ARRIVE_DESTINATION' });
+      showToast('목적지에 도착했어요.', 'info');
+      return;
+    }
+
+    const nextIndex = nextActiveStepIndex(current, state.steps, state.activeStepIndex);
+    if (nextIndex !== state.activeStepIndex || Math.abs(destinationDistance - state.remainingDistance) >= 2) {
+      const nextState = {
+        ...state,
+        activeStepIndex: nextIndex,
+        remainingDistance: destinationDistance,
+      };
+      navigationRef.current = nextState;
+      setNavigation(nextState);
+      postToMap({
+        type: 'NAV_PROGRESS',
+        activeStepIndex: nextIndex,
+        remainingDistance: Math.round(destinationDistance),
+      });
+    }
+  }
+
   async function handleNavigate() {
     if (!userInput.trim()) return;
     setLoading(true);
     try {
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const { latitude, longitude } = loc.coords;
+      const current = { lat: loc.coords.latitude, lng: loc.coords.longitude };
       const res = await fetch(`${BASE_URL}/navigate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userInput, lat: latitude, lng: longitude }),
+        body: JSON.stringify({ question: userInput, lat: current.lat, lng: current.lng }),
       });
       const data = await res.json();
-      if (data.error) { showToast(data.error, 'error'); return; }
+      if (data.error) {
+        showToast(data.error, 'error');
+        return;
+      }
+
+      const steps = (data.steps || []) as RouteStep[];
+      const initialStepIndex = nextActiveStepIndex(current, steps, 0);
+      const destinationDistance = distanceMeters(current, {
+        lat: data.destination.lat,
+        lng: data.destination.lng,
+      });
+      const nextNavigation: NavigationState = {
+        destination: data.destination,
+        steps,
+        activeStepIndex: initialStepIndex,
+        totalDistance: data.distance || 0,
+        duration: data.duration || 0,
+        remainingDistance: destinationDistance,
+        arrived: destinationDistance <= ARRIVAL_RADIUS_M,
+      };
+
       setSelectedPlace(data.destination);
-      setIsNavigating(true);
-      webviewRef.current?.postMessage(
-        JSON.stringify({
-          type: 'DRAW_ROUTE',
-          route: data.route,
-          destination: data.destination,
-          steps: data.steps,
-          distance: data.distance,
-          duration: data.duration,
-        })
-      );
+      setNavigation(nextNavigation);
+      navigationRef.current = nextNavigation;
+      setFollowUser(true);
+      postToMap({
+        type: 'DRAW_ROUTE',
+        route: data.route,
+        destination: data.destination,
+        steps,
+        distance: data.distance,
+        duration: data.duration,
+        activeStepIndex: initialStepIndex,
+        remainingDistance: Math.round(destinationDistance),
+        follow: true,
+      });
+
+      if (nextNavigation.arrived) {
+        postToMap({ type: 'ARRIVE_DESTINATION' });
+        showToast('목적지에 도착했어요.', 'info');
+      }
     } catch {
       showToast('서버 연결에 실패했습니다.', 'error');
     } finally {
@@ -109,9 +271,11 @@ export default function MapScreen({ t }: { t: Tokens }) {
   }
 
   function stopNavigation() {
-    setIsNavigating(false);
+    setNavigation(null);
+    navigationRef.current = null;
     setSelectedPlace(null);
-    webviewRef.current?.postMessage(JSON.stringify({ type: 'CLEAR_ROUTE' }));
+    setFollowUser(true);
+    postToMap({ type: 'CLEAR_ROUTE' });
   }
 
   function quickMove(name: string) {
@@ -119,22 +283,25 @@ export default function MapScreen({ t }: { t: Tokens }) {
     if (place) {
       setUserInput(name);
       setSelectedPlace(place);
-      webviewRef.current?.postMessage(
-        JSON.stringify({ type: 'MOVE_TO', lat: place.lat, lng: place.lng })
-      );
+      postToMap({ type: 'MOVE_TO', lat: place.lat, lng: place.lng });
     }
+  }
+
+  function recenterUser() {
+    setFollowUser(true);
+    postToMap({ type: 'FOLLOW_USER', enabled: true, recenter: true });
   }
 
   function onWebViewMessage(event: { nativeEvent: { data: string } }) {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'MARKER_CLICK') setSelectedPlace(data.place);
+      if (data.type === 'USER_DRAGGED_MAP') setFollowUser(false);
     } catch (_) {}
   }
 
   return (
     <View style={[s.container, { backgroundColor: t.bg }]}>
-      {/* 헤더 */}
       <View style={[s.headerRow, { backgroundColor: t.surface, borderBottomColor: t.borderSoft }]}>
         <View style={{ flex: 1 }}>
           <Text style={[s.headerTitle, { color: t.text }]}>캠퍼스 지도</Text>
@@ -142,7 +309,6 @@ export default function MapScreen({ t }: { t: Tokens }) {
         </View>
       </View>
 
-      {/* 검색창 */}
       <View style={[s.panel, { backgroundColor: t.surface, borderBottomColor: t.borderSoft }]}>
         <View style={s.searchRow}>
           <View style={[s.searchInner, { backgroundColor: t.surface2, borderColor: t.borderSoft }]}>
@@ -151,7 +317,7 @@ export default function MapScreen({ t }: { t: Tokens }) {
             </View>
             <TextInput
               style={[s.input, { color: t.text }]}
-              placeholder="어디로 갈까요? (예: 도서관, 학생식당)"
+              placeholder="어디로 갈까요? (예: 본부동, 도서관)"
               placeholderTextColor={t.textMute}
               value={userInput}
               onChangeText={setUserInput}
@@ -177,19 +343,32 @@ export default function MapScreen({ t }: { t: Tokens }) {
           </TouchableOpacity>
         </View>
 
-        {isNavigating ? (
+        {navigation ? (
           <View style={[s.navState, { backgroundColor: t.surface2, borderColor: t.borderSoft }]}>
-            <View style={[s.navStateIcon, { backgroundColor: t.blueSoft }]}>
-              <Ionicons name="navigate-outline" size={16} color={t.blue} />
+            <View style={[s.navStateIcon, { backgroundColor: navigation.arrived ? '#DCFCE7' : t.blueSoft }]}>
+              <Ionicons
+                name={navigation.arrived ? 'checkmark-circle-outline' : 'navigate-outline'}
+                size={16}
+                color={navigation.arrived ? '#16A34A' : t.blue}
+              />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[s.navStateTitle, { color: t.text }]} numberOfLines={1}>
-                {selectedPlace?.place_name || '경로 안내 중'}
+                {navigation.arrived ? '도착했습니다' : `${navigation.destination.place_name} 안내 중`}
               </Text>
-              <Text style={[s.navStateSub, { color: t.textSoft }]}>지도의 안내 패널을 확인해주세요.</Text>
+              <Text style={[s.navStateSub, { color: t.textSoft }]} numberOfLines={1}>
+                {navigation.arrived
+                  ? '안내가 자동으로 종료되었어요.'
+                  : `남은 거리 ${formatDistance(navigation.remainingDistance)} · 남은 단계 ${remainingSteps.length}개`}
+              </Text>
             </View>
+            {!navigation.arrived && (
+              <TouchableOpacity style={[s.followBtn, { backgroundColor: followUser ? t.blue : t.surface }]} onPress={recenterUser} activeOpacity={0.85}>
+                <Ionicons name="locate-outline" size={15} color={followUser ? '#fff' : t.blue} />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={s.stopBtn} onPress={stopNavigation} activeOpacity={0.85}>
-              <Text style={s.stopText}>종료</Text>
+              <Text style={s.stopText}>{navigation.arrived ? '닫기' : '종료'}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -209,7 +388,6 @@ export default function MapScreen({ t }: { t: Tokens }) {
         )}
       </View>
 
-      {/* 카카오맵 WebView */}
       <WebView
         ref={webviewRef}
         style={s.map}
@@ -225,7 +403,6 @@ export default function MapScreen({ t }: { t: Tokens }) {
         mixedContentMode="always"
       />
 
-      {/* 에러 배너 */}
       {mapError && (
         <View style={[s.errorBanner, { backgroundColor: '#FEF2F2', borderTopColor: '#FCA5A5' }]}>
           <Ionicons name="alert-circle-outline" size={15} color="#DC2626" />
@@ -233,8 +410,7 @@ export default function MapScreen({ t }: { t: Tokens }) {
         </View>
       )}
 
-      {/* 선택 장소 카드 */}
-      {selectedPlace && !isNavigating && (
+      {selectedPlace && !navigation && (
         <View style={[s.placeCard, { backgroundColor: t.surface, borderColor: t.borderSoft }]}>
           <View style={s.placeHead}>
             <View style={[s.placeIcon, { backgroundColor: t.blueSoft }]}>
@@ -312,6 +488,11 @@ const s = StyleSheet.create({
   navStateIcon: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   navStateTitle: { fontSize: 13.5, fontWeight: '900', letterSpacing: 0 },
   navStateSub: { fontSize: 11.5, fontWeight: '600', marginTop: 1, letterSpacing: 0 },
+  followBtn: {
+    width: 34, height: 34, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(37,99,235,0.25)',
+  },
   stopBtn: {
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#EF4444',
     alignItems: 'center', justifyContent: 'center',

@@ -298,8 +298,14 @@ def get_map():
     var openInfowindow = null;
     var routePolyline  = null;
     var userOverlay    = null;
+    var lastUserPosition = null;
     var destMarker     = null;
     var stepOverlays   = [];
+    var routeSteps     = [];
+    var routeDuration  = 0;
+    var followUser     = true;
+    var routeActive    = false;
+    var hasFitRoute    = false;
 
     places.forEach(function(place) {{
       var pos    = new kakao.maps.LatLng(place.lat, place.lng);
@@ -315,8 +321,16 @@ def get_map():
       }});
     }});
 
-    function updateUserLocation(lat, lng) {{
+    kakao.maps.event.addListener(map, 'dragstart', function() {{
+      followUser = false;
+      if (window.ReactNativeWebView) {{
+        window.ReactNativeWebView.postMessage(JSON.stringify({{ type: 'USER_DRAGGED_MAP' }}));
+      }}
+    }});
+
+    function updateUserLocation(lat, lng, shouldFollow) {{
       var pos = new kakao.maps.LatLng(lat, lng);
+      lastUserPosition = pos;
       var dot = '<div style="width:16px;height:16px;background:#1B76FF;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(27,118,255,0.5);"></div>';
       if (!userOverlay) {{
         userOverlay = new kakao.maps.CustomOverlay({{ content: dot, position: pos, zIndex: 10 }});
@@ -324,7 +338,67 @@ def get_map():
       }} else {{
         userOverlay.setPosition(pos);
       }}
-      map.setCenter(pos);
+      if (shouldFollow || followUser) {{
+        map.panTo(pos);
+      }}
+    }}
+
+    function stepMarkerHtml(label, active) {{
+      var bg = active ? '#2563EB' : '#fff';
+      var fg = active ? '#fff' : '#2563EB';
+      var border = active ? '#2563EB' : '#bfdbfe';
+      return '<div style="width:24px;height:24px;border-radius:8px;background:' + bg + ';border:2px solid ' + border + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:' + fg + ';box-shadow:0 4px 12px rgba(15,23,42,0.22);">' + label + '</div>';
+    }}
+
+    function setStepVisibility(activeStepIndex) {{
+      stepOverlays.forEach(function(overlay, i) {{
+        if (i < activeStepIndex) {{
+          overlay.setMap(null);
+        }} else {{
+          overlay.setContent(stepMarkerHtml(i + 1, i === activeStepIndex));
+          overlay.setMap(map);
+        }}
+      }});
+    }}
+
+    function renderSteps(activeStepIndex) {{
+      var list = document.getElementById('steps-list');
+      list.innerHTML = '';
+      var remaining = routeSteps.slice(activeStepIndex);
+      if (!remaining.length) {{
+        var done = document.createElement('div');
+        done.className = 'step-item current';
+        done.innerHTML =
+          '<div class="step-icon">✓</div>' +
+          '<div class="step-info">' +
+            '<div class="step-dir">도착지 근처에 도착했습니다</div>' +
+            '<div class="step-dist">안내를 종료합니다</div>' +
+          '</div>';
+        list.appendChild(done);
+        return;
+      }}
+
+      remaining.forEach(function(s, offset) {{
+        var item = document.createElement('div');
+        item.className = 'step-item' + (offset === 0 ? ' current' : '');
+        item.innerHTML =
+          '<div class="step-icon">' + dirIcon(s.direction) + '</div>' +
+          '<div class="step-info">' +
+            '<div class="step-dir">' + s.direction + '</div>' +
+            '<div class="step-dist">' + (s.distance >= 1000 ? (s.distance/1000).toFixed(1)+'km' : s.distance+'m') + ' 이동</div>' +
+          '</div>';
+        list.appendChild(item);
+      }});
+    }}
+
+    function updateProgress(activeStepIndex, remainingDistance) {{
+      var safeIndex = Math.max(0, Math.min(activeStepIndex || 0, routeSteps.length));
+      renderSteps(safeIndex);
+      setStepVisibility(safeIndex);
+      if (remainingDistance != null) {{
+        document.getElementById('sheet-summary').textContent =
+          '남은 거리 ' + (remainingDistance >= 1000 ? (remainingDistance/1000).toFixed(1) + 'km' : remainingDistance + 'm');
+      }}
     }}
 
     function dirIcon(dir) {{
@@ -423,14 +497,88 @@ def get_map():
       if (destMarker)    destMarker.setMap(null);
       stepOverlays.forEach(function(o) {{ o.setMap(null); }});
       routePolyline = null; destMarker = null; stepOverlays = [];
+      routeSteps = []; routeActive = false; hasFitRoute = false;
       document.getElementById('sheet').style.display = 'none';
+    }}
+
+    function drawRoute(routePoints, dest, steps, distance, duration, activeStepIndex, remainingDistance) {{
+      if (routePolyline) routePolyline.setMap(null);
+      if (destMarker)    destMarker.setMap(null);
+      stepOverlays.forEach(function(o) {{ o.setMap(null); }});
+
+      routeSteps = steps || [];
+      routeDuration = duration || 0;
+      routeActive = true;
+      hasFitRoute = false;
+      stepOverlays = [];
+
+      var path = (routePoints || []).map(function(p) {{
+        return new kakao.maps.LatLng(p.lat, p.lng);
+      }});
+
+      routePolyline = new kakao.maps.Polyline({{
+        path: path, strokeWeight: 6,
+        strokeColor: '#2563EB', strokeOpacity: 0.9, strokeStyle: 'solid'
+      }});
+      routePolyline.setMap(map);
+
+      destMarker = new kakao.maps.Marker({{
+        position: new kakao.maps.LatLng(dest.lat, dest.lng), map: map,
+      }});
+      new kakao.maps.InfoWindow({{
+        content: '<div class="place-label">목적지 · ' + dest.place_name + '</div>',
+      }}).open(map, destMarker);
+
+      if (path.length) {{
+        var bounds = new kakao.maps.LatLngBounds();
+        path.forEach(function(p) {{ bounds.extend(p); }});
+        if (lastUserPosition) bounds.extend(lastUserPosition);
+        map.setBounds(bounds, 60);
+        hasFitRoute = true;
+      }}
+
+      routeSteps.forEach(function(s, i) {{
+        if (s.lat == null || s.lng == null) return;
+        var overlay = new kakao.maps.CustomOverlay({{
+          position: new kakao.maps.LatLng(s.lat, s.lng),
+          content: stepMarkerHtml(i + 1, false),
+          zIndex: 5,
+        }});
+        overlay.setMap(map);
+        stepOverlays.push(overlay);
+      }});
+
+      document.getElementById('sheet-dest').textContent = dest.place_name + '까지 안내';
+      document.getElementById('sheet-summary').textContent =
+        (duration || '?') + '분 · ' + (distance >= 1000 ? (distance/1000).toFixed(1) + 'km' : distance + 'm');
+      document.getElementById('sheet').style.display = 'flex';
+      updateProgress(activeStepIndex || 0, remainingDistance);
+    }}
+
+    function highlightStep(index) {{
+      updateProgress(index, null);
+    }}
+
+    function arriveDestination() {{
+      routeActive = false;
+      updateProgress(routeSteps.length, 0);
+      stepOverlays.forEach(function(o) {{ o.setMap(null); }});
+      stepOverlays = [];
+      document.getElementById('sheet-dest').textContent = '도착했습니다';
+      document.getElementById('sheet-summary').textContent = '안내가 자동으로 종료되었습니다';
     }}
 
     function handleMessage(event) {{
       try {{
         var data = JSON.parse(event.data);
-        if (data.type === 'UPDATE_LOCATION') updateUserLocation(data.lat, data.lng);
-        if (data.type === 'DRAW_ROUTE')      drawRoute(data.route, data.destination, data.steps, data.distance, data.duration);
+        if (data.type === 'UPDATE_LOCATION') updateUserLocation(data.lat, data.lng, data.follow);
+        if (data.type === 'DRAW_ROUTE')      drawRoute(data.route, data.destination, data.steps, data.distance, data.duration, data.activeStepIndex, data.remainingDistance);
+        if (data.type === 'NAV_PROGRESS')    updateProgress(data.activeStepIndex, data.remainingDistance);
+        if (data.type === 'ARRIVE_DESTINATION') arriveDestination();
+        if (data.type === 'FOLLOW_USER') {{
+          followUser = !!data.enabled;
+          if (data.recenter && userOverlay) map.panTo(userOverlay.getPosition());
+        }}
         if (data.type === 'CLEAR_ROUTE')     clearRoute();
         if (data.type === 'MOVE_TO') {{
           map.setCenter(new kakao.maps.LatLng(data.lat, data.lng));
