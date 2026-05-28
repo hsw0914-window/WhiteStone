@@ -28,7 +28,7 @@ async def initialize_app() -> None:
                 runtime.dataset.append(json.loads(line))
 
     docs_to_embed = [item["instruction"] + " " + item["output"] for item in runtime.dataset]
-    embeddings = runtime.model.encode(docs_to_embed)
+    embeddings = runtime.model.encode(docs_to_embed, normalize_embeddings=True)
     embeddings = np.array(embeddings).astype("float32")
 
     dimension = embeddings.shape[1]

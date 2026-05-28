@@ -60,7 +60,7 @@ SCHOOL_SCOPE_KEYWORDS = [
     "성적", "졸업", "학점", "등록금", "장학", "장학금", "기숙사",
     "생활관", "도서관", "학술정보관", "셔틀", "버스", "통학",
     "건물", "위치", "식당", "학생식당", "채플", "증명서", "발급",
-    "비교과", "동아리", "교수", "학부", "학과", "사무실", "부서",
+    "비교과", "동아리", "축제", "행사", "교수", "학부", "학과", "사무실", "부서",
     "와이파이", "wifi", "wi-fi", "bu-wlan", "로드맵", "진로",
     "카피킬러", "교내", "학번", "학생", "입학", "복학", "휴학",
     "인쇄", "프린트", "복사", "복사기", "프린터",
@@ -130,7 +130,7 @@ async def startup():
                 dataset.append(json.loads(line))
 
     docs_to_embed = [d["instruction"] + " " + d["output"] for d in dataset]
-    embeddings = model.encode(docs_to_embed)
+    embeddings = model.encode(docs_to_embed, normalize_embeddings=True)
     embeddings = np.array(embeddings).astype("float32")
 
     dimension = embeddings.shape[1]
@@ -149,7 +149,7 @@ async def startup():
 
 # ── FAISS 검색 (top-K) ───────────────────────────────────────────────────────
 def faiss_search(question: str):
-    query_embedding = model.encode([question])
+    query_embedding = model.encode([question], normalize_embeddings=True)
     query_embedding = np.array(query_embedding).astype("float32")
     distances, indices = index.search(query_embedding, TOP_K)
     return indices[0], distances[0]
@@ -300,6 +300,7 @@ def get_map():
 
     var places        = {places_json};
     var openInfowindow = null;
+    var placeMarkers  = [];
     var routePolyline  = null;
     var userOverlay    = null;
     var lastUserPosition = null;
@@ -323,7 +324,18 @@ def get_map():
         iw.open(map, marker);
         openInfowindow = iw;
       }});
+      placeMarkers.push({{ marker: marker, infowindow: iw }});
     }});
+
+    function setPlaceMarkersVisible(visible) {{
+      if (!visible && openInfowindow) {{
+        openInfowindow.close();
+        openInfowindow = null;
+      }}
+      placeMarkers.forEach(function(item) {{
+        item.marker.setMap(visible ? map : null);
+      }});
+    }}
 
     kakao.maps.event.addListener(map, 'dragstart', function() {{
       followUser = false;
@@ -503,12 +515,14 @@ def get_map():
       routePolyline = null; destMarker = null; stepOverlays = [];
       routeSteps = []; routeActive = false; hasFitRoute = false;
       document.getElementById('sheet').style.display = 'none';
+      setPlaceMarkersVisible(true);
     }}
 
     function drawRoute(routePoints, dest, steps, distance, duration, activeStepIndex, remainingDistance) {{
       if (routePolyline) routePolyline.setMap(null);
       if (destMarker)    destMarker.setMap(null);
       stepOverlays.forEach(function(o) {{ o.setMap(null); }});
+      setPlaceMarkersVisible(false);
 
       routeSteps = steps || [];
       routeDuration = duration || 0;
