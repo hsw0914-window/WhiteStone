@@ -1,0 +1,43 @@
+import React from 'react';
+import { SvgXml } from 'react-native-svg';
+
+const SVG_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="iconGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="55%" stop-color="#1D4ED8"/>
+      <stop offset="100%" stop-color="#0B2A6B"/>
+    </linearGradient>
+    <radialGradient id="ringGrad" cx="0.35" cy="0.3" r="0.85">
+      <stop offset="0%" stop-color="#5EA0FF"/>
+      <stop offset="60%" stop-color="#1E4FCF"/>
+      <stop offset="100%" stop-color="#0A1F58"/>
+    </radialGradient>
+    <linearGradient id="hi" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="196" height="196" rx="48" fill="url(#iconGrad)"/>
+  <rect x="2" y="2" width="196" height="98" rx="48" fill="url(#hi)"/>
+  <circle cx="100" cy="100" r="72" fill="url(#ringGrad)" stroke="#fff" stroke-width="2" opacity="0.95"/>
+  <circle cx="100" cy="100" r="64" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+  <circle cx="100" cy="100" r="56" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <path d="M100 50 L150 138 Q152 144 145 144 L55 144 Q48 144 50 138 Z" fill="rgba(255,255,255,0.98)" stroke="rgba(30,80,200,0.2)" stroke-width="1"/>
+  <g transform="translate(100 78)">
+    <line x1="0" y1="-10" x2="0" y2="-16" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="0" cy="-18" r="2.2" fill="#1D4ED8"/>
+    <rect x="-11" y="-10" width="22" height="18" rx="5" fill="#1D4ED8"/>
+    <circle cx="-4" cy="-1" r="1.8" fill="#fff"/>
+    <circle cx="4" cy="-1" r="1.8" fill="#fff"/>
+    <rect x="-4" y="3" width="8" height="2" rx="1" fill="#1D4ED8"/>
+    <rect x="-13" y="-4" width="2" height="6" rx="1" fill="#1D4ED8"/>
+    <rect x="11" y="-4" width="2" height="6" rx="1" fill="#1D4ED8"/>
+  </g>
+  <text x="100" y="115" text-anchor="middle" font-family="system-ui" font-size="22" font-weight="900" fill="#0B2A6B" letter-spacing="-0.5">흰돌이</text>
+  <text x="100" y="132" text-anchor="middle" font-family="system-ui" font-size="9" font-weight="800" fill="#1D4ED8" letter-spacing="2">CHATBOT</text>
+</svg>`;
+
+export default function Mascot({ size = 36 }) {
+  return <SvgXml xml={SVG_XML} width={size} height={size}/>;
+}
